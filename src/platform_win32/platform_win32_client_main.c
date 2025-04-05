@@ -3,16 +3,15 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#include "platform.h"
 #include "math.h"
 #include "game_state.h"
 #include "render.h"
+#include "game_input.h"
+#include "game_constants.h"
 #include "platform_win32/platform_win32_common.h"
 #include "platform_win32/platform_win32_render.h"
 #include "platform_win32/platform_win32_input.h"
 #include "platform_win32/platform_win32_network_client.h"
-
-#define FRAME_DURATION_NS 8333333
 
 struct MainMemory
 {
@@ -21,6 +20,8 @@ struct MainMemory
     struct PlatformWin32Render render;
 
     struct PlatformWin32Input input;
+
+    struct PlatformWin32NetworkClient network_client;
 
     struct GameState game_state;
     struct GameState prev_game_state;
@@ -38,6 +39,11 @@ struct PlatformWin32Input* platform_win32_get_input()
     return &g_main_memory.input;
 }
 
+struct PlatformWin32NetworkClient* platform_win32_get_network_client()
+{
+    return &g_main_memory.network_client;
+}
+
 struct PlatformWin32Common* platform_win32_get_common()
 {
     return &g_main_memory.win32_common;
@@ -46,7 +52,9 @@ struct PlatformWin32Common* platform_win32_get_common()
 
 void WinMainCRTStartup()
 {
-    platform_win32_init_common();
+    platform_win32_init_common(1280 + 140, 345);
+
+    platform_win32_network_client_init("localhost", 4242);
 
     init_game_state(&g_main_memory.game_state);
     init_game_state(&g_main_memory.prev_game_state);
@@ -75,9 +83,38 @@ void WinMainCRTStartup()
             DispatchMessage(&msg);
         }
 
-        if(is_keyboard_key_down(KB_ESCAPE))
+        platform_win32_input_sample();
+
+        if(platform_win32_is_keyboard_key_down(KB_ESCAPE))
         {
             break;
+        }
+
+        if(platform_win32_is_keyboard_key_down(KB_LCTRL))
+        {
+            s32 mouse_dx;
+            s32 mouse_dy;
+            platform_win32_get_mouse_screen_delta(&mouse_dx, &mouse_dy);
+
+            // TODO(mfritz) Move into common module
+            struct PlatformWin32Common* common = platform_win32_get_common();
+            const HWND hwnd = common->hwnd;
+            RECT window_rect;
+            const BOOL get_window_rect_result = GetWindowRect(hwnd, &window_rect);
+            ASSERT(get_window_rect_result, "GetWindowRect failed.");
+
+            s32 new_pos_x = window_rect.left + mouse_dx;
+            s32 new_pos_y = window_rect.top + mouse_dy;
+
+            const BOOL set_window_pos_result = SetWindowPos(
+              hwnd,
+              0,
+              new_pos_x,
+              new_pos_y,
+              window_rect.right - window_rect.left,
+              window_rect.bottom - window_rect.top,
+              0);
+            ASSERT(set_window_pos_result, "SetWindowPos failed.");
         }
 
         if(frame_timer_ns < FRAME_DURATION_NS)
@@ -87,7 +124,12 @@ void WinMainCRTStartup()
         }
         frame_timer_ns -= FRAME_DURATION_NS;
 
-        update_game_state(&g_main_memory.game_state, &g_main_memory.prev_game_state);
+        struct PlayerInput player_input;
+        platform_win32_input_to_player_input(&player_input);
+
+        platform_win32_network_client_update(&g_main_memory.game_state, &player_input);
+
+        // update_game_state(&g_main_memory.game_state, &g_main_memory.prev_game_state, &game_input);
 
         platform_win32_render_game_state(&g_main_memory.game_state);
         platform_win32_input_end_frame();

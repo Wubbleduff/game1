@@ -3,16 +3,15 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#include "platform.h"
 #include "math.h"
 #include "game_state.h"
 #include "render.h"
+#include "game_input.h"
+#include "game_constants.h"
 #include "platform_win32/platform_win32_common.h"
 #include "platform_win32/platform_win32_render.h"
 #include "platform_win32/platform_win32_input.h"
 #include "platform_win32/platform_win32_network_server.h"
-
-#define FRAME_DURATION_NS 8333333
 
 struct MainMemory
 {
@@ -53,7 +52,7 @@ struct PlatformWin32Common* platform_win32_get_common()
 
 void WinMainCRTStartup()
 {
-    platform_win32_init_common();
+    platform_win32_init_common(140, 345);
 
     platform_win32_start_server("localhost", 4242);
 
@@ -63,6 +62,8 @@ void WinMainCRTStartup()
     s64 frame_timer_ns = 0;
     s64 last_frame_time_ns = platform_win32_get_time_ns();
 
+
+    s64 frame_num = 0;
     u64 running = 1;
     while(running)
     {
@@ -84,7 +85,9 @@ void WinMainCRTStartup()
             DispatchMessage(&msg);
         }
 
-        if(is_keyboard_key_down(KB_ESCAPE))
+        platform_win32_input_sample();
+
+        if(platform_win32_is_keyboard_key_down(KB_ESCAPE))
         {
             break;
         }
@@ -96,10 +99,17 @@ void WinMainCRTStartup()
         }
         frame_timer_ns -= FRAME_DURATION_NS;
 
-        update_game_state(&g_main_memory.game_state, &g_main_memory.prev_game_state);
+        struct GameInput game_input;
+        platform_win32_server_receive_client_inputs(frame_num, &game_input);
+
+        update_game_state(&g_main_memory.game_state, &g_main_memory.prev_game_state, &game_input);
+
+        platform_win32_server_send_game_state(&g_main_memory.game_state);
 
         platform_win32_render_game_state(&g_main_memory.game_state);
+
         platform_win32_input_end_frame();
+        frame_num++;
     }
 
     ExitProcess(0);

@@ -67,23 +67,23 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
         case WM_LBUTTONDOWN:
         {
-            // g_mouse_button[0] = true;
+            platform_win32_set_mouse_button(GAME_MB_LEFT);
         }
         break;
         case WM_LBUTTONUP:
         {
-            // g_mouse_button[0] = false;
+            platform_win32_clear_mouse_button(GAME_MB_LEFT);
         }
         break;
 
         case WM_RBUTTONDOWN:
         {
-            // g_mouse_button[1] = true;
+            platform_win32_set_mouse_button(GAME_MB_RIGHT);
         }
         break;
         case WM_RBUTTONUP:
         {
-            // g_mouse_button[1] = false;
+            platform_win32_clear_mouse_button(GAME_MB_RIGHT);
         }
         break;
 
@@ -97,7 +97,7 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     return result;
 }
 
-void platform_win32_init_common()
+void platform_win32_init_common(const u32 window_x, const u32 window_y)
 {
     struct PlatformWin32Common* common = platform_win32_get_common();
 
@@ -114,12 +114,10 @@ void platform_win32_init_common()
     const ATOM register_class_result = RegisterClass(&wc);
     ASSERT(register_class_result, "RegisterClass failed.");
 
-    const u32 monitor_width = GetSystemMetrics(SM_CXSCREEN);
-    const u32 monitor_height = GetSystemMetrics(SM_CYSCREEN);
-    const u32 window_width = 1400;
+    //const u32 monitor_width = GetSystemMetrics(SM_CXSCREEN);
+    //const u32 monitor_height = GetSystemMetrics(SM_CYSCREEN);
+    const u32 window_width = 1000;
     const u32 window_height = (window_width * 3) / 4;
-    const u32 window_x = monitor_width / 2 - window_width / 2;
-    const u32 window_y = monitor_height / 2 - window_height / 2;
 
     common->hwnd = CreateWindowEx(
         0,

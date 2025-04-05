@@ -44,6 +44,7 @@ _Static_assert(sizeof(f64) == 8, "Unexpected type size.");
 
 void assert_fn(const char* file, int line, const u64 c, const char* msg);
 #define ASSERT(c, msg, ...) assert_fn(__FILE__, __LINE__, (const u64)(c), (msg))
+#define HALT() assert_fn(__FILE__, __LINE__, 0, "")
 
 #define ARRAY_COUNT(N) (sizeof(N) / sizeof((N)[0]))
 

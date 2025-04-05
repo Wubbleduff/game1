@@ -2,6 +2,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "platform_win32/platform_win32_input.h"
+#include "platform_win32/platform_win32_common.h"
+#include "game_input.h"
 
 // Maps Win32 VK code to KeyboardKey enum.
 const u32 win32_vk_code_to_keyboard_key[] = {
@@ -180,15 +182,19 @@ const u32 win32_vk_code_to_keyboard_key[] = {
     /* VK_RSHIFT      0xA1 */  KB_NOT_SUPPORTED,
     /* VK_LCONTROL    0xA2 */  KB_LCTRL,
     /* VK_RCONTROL    0xA3 */  KB_NOT_SUPPORTED,
+    /* VK_LMENU       0xA4 */  KB_ALT,
 };
-_Static_assert(ARRAY_COUNT(win32_vk_code_to_keyboard_key) == 0xA4, "VK map is not the expected size.");
-
+_Static_assert(ARRAY_COUNT(win32_vk_code_to_keyboard_key) == 0xA5, "VK map is not the expected size.");
 
 void platform_win32_init_input()
 {
     struct PlatformWin32Input* input = platform_win32_get_input();
     ZERO_ARRAY(input->keyboard_buf);
     ZERO_ARRAY(input->prev_keyboard_buf);
+    input->mouse_screen_x = 0;
+    input->mouse_screen_y = 0;
+    input->prev_mouse_screen_x = 0;
+    input->prev_mouse_screen_y = 0;
 }
 
 enum KeyboardKey platform_win32_vk_code_to_keyboard_key(u64 vk_key_code)
@@ -197,10 +203,26 @@ enum KeyboardKey platform_win32_vk_code_to_keyboard_key(u64 vk_key_code)
     return win32_vk_code_to_keyboard_key[vk_key_code];
 }
 
+void platform_win32_input_sample()
+{
+    struct PlatformWin32Common* common = platform_win32_get_common();
+    struct PlatformWin32Input* input = platform_win32_get_input();
+
+    POINT p;
+    GetCursorPos(&p);
+    ScreenToClient(common->hwnd, &p);
+
+    input->mouse_screen_x = p.x;
+    input->mouse_screen_y = p.y;
+}
+
 void platform_win32_input_end_frame()
 {
     struct PlatformWin32Input* input = platform_win32_get_input();
     COPY_ARRAY(input->prev_keyboard_buf, input->keyboard_buf);
+    input->prev_mouse_button = input->mouse_button;
+    input->prev_mouse_screen_x = input->mouse_screen_x;
+    input->prev_mouse_screen_y = input->mouse_screen_y;
 }
 
 static u32 is_keyboard_key_valid(const enum KeyboardKey k)
@@ -211,21 +233,70 @@ static u32 is_keyboard_key_valid(const enum KeyboardKey k)
 void platform_win32_set_keyboard_key(const enum KeyboardKey k)
 {
     struct PlatformWin32Input* input = platform_win32_get_input();
-    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key.");
+    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key %u", k);
     input->keyboard_buf[k >> 3] |= (1 << (k & 7));
 }
 
 void platform_win32_clear_keyboard_key(const enum KeyboardKey k)
 {
     struct PlatformWin32Input* input = platform_win32_get_input();
-    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key.");
+    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key %u", k);
     input->keyboard_buf[k >> 3] &= ~(1 << (k & 7));
 }
 
-u32 is_keyboard_key_down(const enum KeyboardKey k)
+u32 platform_win32_is_keyboard_key_down(const enum KeyboardKey k)
 {
     struct PlatformWin32Input* input = platform_win32_get_input();
-    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key.");
+    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key %u", k);
     return (input->keyboard_buf[k >> 3] & (1 << (k & 7))) != 0;
+}
+
+static u32 is_valid_mouse_button(const enum MouseButton m)
+{
+    return m >= GAME_MB_LEFT && m < NUM_MOUSE_BUTTONS;
+}
+
+void platform_win32_set_mouse_button(const enum MouseButton m)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    ASSERT(is_valid_mouse_button(m), "Invalid mouse button %u", m);
+    input->mouse_button |= (u8)(1U << m);
+}
+
+void platform_win32_clear_mouse_button(const enum MouseButton m)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    ASSERT(is_valid_mouse_button(m), "Invalid mouse button %u", m);
+    input->mouse_button &= ~(u8)(1U << m);
+}
+
+void platform_win32_get_mouse_screen_position(s32* x, s32* y)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    *x = input->mouse_screen_x;
+    *y = input->mouse_screen_y;
+}
+
+void platform_win32_get_mouse_screen_delta(s32* x, s32* y)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    *x = input->mouse_screen_x - input->prev_mouse_screen_x;
+    *y = input->mouse_screen_y - input->prev_mouse_screen_y;
+}
+
+void platform_win32_input_to_player_input(struct PlayerInput* player_input)
+{
+    player_input->move_x =
+        platform_win32_is_keyboard_key_down(KB_A) && platform_win32_is_keyboard_key_down(KB_D) ? 127
+        : platform_win32_is_keyboard_key_down(KB_A) ? 0
+        : platform_win32_is_keyboard_key_down(KB_D) ? 254
+        : 127;
+
+    player_input->move_y =
+        platform_win32_is_keyboard_key_down(KB_W) && platform_win32_is_keyboard_key_down(KB_S) ? 127
+        : platform_win32_is_keyboard_key_down(KB_S) ? 0
+        : platform_win32_is_keyboard_key_down(KB_W) ? 254
+        : 127;
+
 }
 

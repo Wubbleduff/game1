@@ -1,0 +1,5 @@
+#pragma once
+
+#define MAX_ACTIVE_PLAYERS 32
+#define FRAME_DURATION_NS 8000000
+

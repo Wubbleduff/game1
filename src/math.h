@@ -31,6 +31,8 @@ inline s16 square_s16(const s16 n) { return n*n; }
 inline s32 square_s32(const s32 n) { return n*n; }
 inline s64 square_s64(const s64 n) { return n*n; }
 
+inline f32 square_f32(const f32 n) { return n*n; }
+
 inline u8 min_u8(const u8 a, const u8 b) { return a < b ? a : b; }
 inline u16 min_u16(const u16 a, const u16 b) { return a < b ? a : b; }
 inline u32 min_u32(const u32 a, const u32 b) { return a < b ? a : b; }
@@ -118,22 +120,49 @@ typedef struct v4Tag
     };
 } v4;
 
+inline v2 make_v2(const f32 x, const f32 y)
+{
+    v2 r;
+    r.v = _mm_setr_ps(x, y, 0.0f, 0.0f);
+    return r;
+}
+
 inline v3 make_v3(const f32 x, const f32 y, const f32 z)
 {
     v3 r;
-    r.x = x;
-    r.y = y;
-    r.z = z;
+    r.v = _mm_setr_ps(x, y, z, 0.0f);
+    return r;
+}
+
+inline v2 v2_zero()
+{
+    v2 r = {0};
     return r;
 }
 
 inline v3 v3_zero()
 {
-    v3 r;
-    r.x = 0.0f;
-    r.y = 0.0f;
-    r.z = 0.0f;
+    v3 r = {0};
     return r;
+}
+
+inline f32 v2_dot(v2 a, v2 b)
+{
+    // | a.x | a.y | a.z | - |
+    // | b.x | b.y | b.z | - |
+
+    v2 r;
+
+    //     00        01
+    // | a.x*b.x | a.y*b.y | - | - |
+    __m128 p = _mm_mul_ps(a.v, b.v);
+
+    // | a.x*b.x | - | - | - |
+    // +
+    // | a.y*b.y | - | - | - |
+    r.v = _mm_add_ps(p, _mm_shuffle_ps(p, p, 0b00000001));
+
+    return r.m[0];
 }
 
 inline f32 v3_dot(v3 a, v3 b)
@@ -188,10 +217,39 @@ inline v3 v3_sub(v3 a, v3 b)
     return r;
 }
 
+inline v2 v2_scale(v2 a, const f32 b)
+{
+    v2 r;
+    r.v = _mm_mul_ps(a.v, _mm_set1_ps(b));
+    return r;
+}
+
 inline v3 v3_scale(v3 a, const f32 b)
 {
     v3 r;
     r.v = _mm_mul_ps(a.v, _mm_set1_ps(b));
+    return r;
+}
+
+inline v2 v2_normalize(v2 a)
+{
+    // TODO(mfritz) No need to go to scalar here.
+    v2 r = a;
+    const f32 len_sqr = v2_dot(a, a);
+    const f32 len = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set1_ps(len_sqr)));
+    r = v2_scale(r, 1.0f / len);
+    return r;
+}
+
+inline v2 v2_normalize_or_zero(v2 a)
+{
+    // TODO(mfritz) No need to go to scalar here.
+    v2 r = a;
+    const f32 len_sqr = v2_dot(a, a);
+    const f32 len = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set1_ps(len_sqr)));
+    r = len == 0.0f
+        ? v2_zero()
+        : v2_scale(r, 1.0f / len);
     return r;
 }
 

@@ -71,7 +71,7 @@ void platform_win32_render_game_state(struct GameState* game_state)
                 game_state->human_pos_x[i],
                 game_state->human_pos_y[i],
                 0.7f,
-                1.0f);
+                1.0f * (i + 1));
     }
 
     memcpy(render->dib_frame_buffer, render->frame_buffer, render->frame_buffer_width * render->frame_buffer_height * sizeof(render->frame_buffer[0]));
