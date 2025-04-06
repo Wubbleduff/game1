@@ -12,7 +12,7 @@ struct PlayerInput
 struct GameInput
 {
     u32 num_players;
-    u32 player_id[MAX_ACTIVE_PLAYERS];
+    u32 sparse_player_id[MAX_ACTIVE_PLAYERS];
     struct PlayerInput player_input[MAX_ACTIVE_PLAYERS];
 };
 

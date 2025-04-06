@@ -131,6 +131,30 @@ void WinMainCRTStartup()
 
         // update_game_state(&g_main_memory.game_state, &g_main_memory.prev_game_state, &game_input);
 
+        {
+            struct PlatformWin32NetworkClient* client = platform_win32_get_network_client();
+            struct GameState* game_state = &g_main_memory.game_state;
+            struct PlatformWin32Render* render = platform_win32_get_render();
+            u32 found_dense_player_id = u32_MAX;
+            for(u32 i = 0; i < game_state->num_players; i++)
+            {
+                found_dense_player_id =
+                    game_state->sparse_player_id[i] == client->sparse_player_id
+                    ? i
+                    : found_dense_player_id;
+            }
+            if(found_dense_player_id == u32_MAX)
+            {
+                render->camera.pos_x = 0.0f;
+                render->camera.pos_y = 0.0f;
+            }
+            else
+            {
+                render->camera.pos_x = game_state->player_pos_x[found_dense_player_id];
+                render->camera.pos_y = game_state->player_pos_y[found_dense_player_id];
+            }
+        }
+
         platform_win32_render_game_state(&g_main_memory.game_state);
         platform_win32_input_end_frame();
     }

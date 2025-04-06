@@ -39,7 +39,7 @@ void platform_win32_network_client_init(
         client->server_port_str[num] = 0;
     }
 
-    client->player_id = NETWORK_NO_USER_ID;
+    client->sparse_player_id = NETWORK_NO_USER_ID;
 
     struct addrinfo *server_addr = NULL;
     struct addrinfo hints = {0};
@@ -66,7 +66,7 @@ void platform_win32_network_client_update(struct GameState* game_state, const st
 
     s32 last_err;
 
-    if(client->player_id == NETWORK_NO_USER_ID)
+    if(client->sparse_player_id == NETWORK_NO_USER_ID)
     {
         // Send a request for a player ID.
         struct NetworkPacket packet = {0};
@@ -105,7 +105,7 @@ void platform_win32_network_client_update(struct GameState* game_state, const st
             // Eventually receive a player ID.
             if(recv_packet.network_packet_type == PACKET_RESPOND_ID)
             {
-                client->player_id = recv_packet.player_id;
+                client->sparse_player_id = recv_packet.sparse_player_id;
             }
         }
     }
@@ -113,7 +113,7 @@ void platform_win32_network_client_update(struct GameState* game_state, const st
     {
         struct NetworkPacket packet = {0};
         packet.network_packet_type = PACKET_INPUTS;
-        packet.player_id = client->player_id;
+        packet.sparse_player_id = client->sparse_player_id;
         packet.player_input = *player_input;
 
         s32 sendto_result = sendto(client->server_socket, (char*)&packet, sizeof(packet), 0, client->server_addr.ai_addr, sizeof(*client->server_addr.ai_addr));

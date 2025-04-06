@@ -48,10 +48,17 @@ void assert_fn(const char* file, int line, const u64 c, const char* msg);
 
 #define ARRAY_COUNT(N) (sizeof(N) / sizeof((N)[0]))
 
+void *memcpy(void *dst, const void *src, size_t count);
 #define COPY_ARRAY(DST, SRC) \
     do { \
         _Static_assert(sizeof(DST) == sizeof(SRC), "Array element sizes do not match."); \
         memcpy((DST), (SRC), sizeof(SRC)); \
+    } while(0)
+
+#define COPY(DST, SRC, NUM) \
+    do { \
+        _Static_assert(sizeof((DST)[0]) == sizeof((SRC)[0]), "Array element sizes do not match."); \
+        memcpy((DST), (SRC), sizeof((SRC)[0]) * (NUM)); \
     } while(0)
 
 #define ZERO_ARRAY(a) \

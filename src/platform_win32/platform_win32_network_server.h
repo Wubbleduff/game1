@@ -11,11 +11,11 @@ struct PlatformWin32NetworkServer
 {
     SOCKET client_socket;
 
-    u32 next_player_id;
+    u32 next_sparse_player_id;
 
     u32 num_players;
-    u32 player_id[MAX_ACTIVE_PLAYERS];
-    s64 player_last_heard_from[MAX_ACTIVE_PLAYERS];
+    u32 sparse_player_id[MAX_ACTIVE_PLAYERS];
+    s64 player_last_frame_heard_from[MAX_ACTIVE_PLAYERS];
     struct PlayerInput player_input[MAX_ACTIVE_PLAYERS];
     struct sockaddr player_addr[MAX_ACTIVE_PLAYERS];
 };

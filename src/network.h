@@ -21,7 +21,7 @@ struct NetworkPacket
 {
     u8 network_packet_type;
 
-    u32 player_id;
+    u32 sparse_player_id;
 
     struct PlayerInput player_input;
 

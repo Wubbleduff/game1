@@ -57,7 +57,7 @@ void platform_win32_start_server(const char* listen_ipv4_addr, const u16 listen_
 
     server->client_socket = client_socket;
 
-    server->next_player_id = 0;
+    server->next_sparse_player_id = 0;
 
     server->num_players = 0;
 }
@@ -100,23 +100,23 @@ void platform_win32_server_receive_client_inputs(const s64 frame_num, struct Gam
 
             if(recv_packet.network_packet_type == PACKET_INPUTS)
             {
-                u32 found_player_idx = u32_MAX;
+                u32 found_dense_player_id = u32_MAX;
                 for(u32 i = 0; i < server->num_players; i++)
                 {
-                    found_player_idx = server->player_id[i] == recv_packet.player_id ? i : found_player_idx;
+                    found_dense_player_id = server->sparse_player_id[i] == recv_packet.sparse_player_id ? i : found_dense_player_id;
                 }
-                if(found_player_idx != u32_MAX)
+                if(found_dense_player_id != u32_MAX)
                 {
-                    server->player_last_heard_from[found_player_idx] = frame_num;
-                    server->player_input[found_player_idx] = recv_packet.player_input;
+                    server->player_last_frame_heard_from[found_dense_player_id] = frame_num;
+                    server->player_input[found_dense_player_id] = recv_packet.player_input;
                 }
                 else if(server->num_players < MAX_ACTIVE_PLAYERS)
                 {
-                    u32 new_player_idx = server->num_players;
-                    server->player_id[new_player_idx] = recv_packet.player_id;
-                    server->player_last_heard_from[new_player_idx] = frame_num;
-                    server->player_input[new_player_idx] = recv_packet.player_input;
-                    server->player_addr[new_player_idx] = recv_addr;
+                    u32 new_dense_player_id = server->num_players;
+                    server->sparse_player_id[new_dense_player_id] = recv_packet.sparse_player_id;
+                    server->player_last_frame_heard_from[new_dense_player_id] = frame_num;
+                    server->player_input[new_dense_player_id] = recv_packet.player_input;
+                    server->player_addr[new_dense_player_id] = recv_addr;
                     server->num_players++;
                     ASSERT(server->num_players < MAX_ACTIVE_PLAYERS, "Active player overflow.");
                 }
@@ -126,34 +126,34 @@ void platform_win32_server_receive_client_inputs(const s64 frame_num, struct Gam
             {
                 struct NetworkPacket packet = {0};
                 packet.network_packet_type = PACKET_RESPOND_ID;
-                packet.player_id = server->next_player_id;
+                packet.sparse_player_id = server->next_sparse_player_id;
                 s32 sendto_result = sendto(server->client_socket, (char*)&packet, sizeof(packet), 0, &recv_addr, recv_addr_size);
                 last_err = WSAGetLastError();
                 ASSERT(sendto_result != SOCKET_ERROR && last_err == 0, "'sendto' failed with error: %d", last_err);
-                server->next_player_id++;
-                ASSERT(server->next_player_id < u32_MAX, "Player ID overflow.");
+                server->next_sparse_player_id++;
+                ASSERT(server->next_sparse_player_id < u32_MAX, "Player ID overflow.");
             }
         }
     }
 
     // Remove players we haven't heard from in a while.
-    for(u32 player_idx = 0; player_idx < server->num_players; player_idx++)
+    for(u32 dense_player_id = 0; dense_player_id < server->num_players; dense_player_id++)
     {
-        if(frame_num - server->player_last_heard_from[player_idx] > 32)
+        if(frame_num - server->player_last_frame_heard_from[dense_player_id] > 32)
         {
             const u32 end = server->num_players - 1;
-            server->player_id[player_idx] = server->player_id[end];
-            server->player_last_heard_from[player_idx] = server->player_last_heard_from[end];
-            server->player_input[player_idx] = server->player_input[end];
+            server->sparse_player_id[dense_player_id] = server->sparse_player_id[end];
+            server->player_last_frame_heard_from[dense_player_id] = server->player_last_frame_heard_from[end];
+            server->player_input[dense_player_id] = server->player_input[end];
             server->num_players--;
         }
     }
 
     // Populate game input with players.
-    for(u32 player_idx = 0; player_idx < server->num_players; player_idx++)
+    for(u32 dense_player_id = 0; dense_player_id < server->num_players; dense_player_id++)
     {
-        game_input->player_id[player_idx] = server->player_id[player_idx];
-        game_input->player_input[player_idx] = server->player_input[player_idx];
+        game_input->sparse_player_id[dense_player_id] = server->sparse_player_id[dense_player_id];
+        game_input->player_input[dense_player_id] = server->player_input[dense_player_id];
     }
     game_input->num_players = server->num_players;
 }
@@ -162,12 +162,12 @@ void platform_win32_server_send_game_state(const struct GameState* game_state)
 {
     struct PlatformWin32NetworkServer* server = platform_win32_get_network_server();
 
-    for(u32 player_idx = 0; player_idx < server->num_players; player_idx++)
+    for(u32 dense_player_id = 0; dense_player_id < server->num_players; dense_player_id++)
     {
         struct NetworkPacket packet = {0};
         packet.network_packet_type = PACKET_GAME_STATE;
         packet.game_state = *game_state;
-        s32 sendto_result = sendto(server->client_socket, (char*)&packet, sizeof(packet), 0, &server->player_addr[player_idx], sizeof(server->player_addr[player_idx]));
+        s32 sendto_result = sendto(server->client_socket, (char*)&packet, sizeof(packet), 0, &server->player_addr[dense_player_id], sizeof(server->player_addr[dense_player_id]));
         s32 last_err = WSAGetLastError();
         ASSERT(sendto_result != SOCKET_ERROR && last_err == 0, "'sendto' failed with error: %d", last_err);
     }

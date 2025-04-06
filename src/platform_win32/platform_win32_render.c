@@ -51,7 +51,7 @@ void platform_win32_init_render()
 
     render->camera.pos_x = 0.0f;
     render->camera.pos_y = 0.0f;
-    render->camera.half_width = 10.0f;
+    render->camera.half_width = 15.0f;
     render->camera.aspect_ratio = (f32)client_rect.bottom / (f32)client_rect.right;
 }
 
@@ -65,13 +65,26 @@ void platform_win32_render_game_state(struct GameState* game_state)
         render->frame_buffer[i] = 0XFF191E18;
     }
 
-    for(u32 i = 0; i < game_state->num_humans; i++)
+    for(u32 i = 0; i < game_state->num_players; i++)
     {
         render_world_rect(
-                game_state->human_pos_x[i],
-                game_state->human_pos_y[i],
-                0.7f,
-                1.0f * (i + 1));
+            game_state->player_pos_x[i],
+            game_state->player_pos_y[i],
+            0.7f,
+            1.0f * (i + 1),
+            0xFFC4A033
+        );
+    }
+
+    for(u32 i = 0; i < game_state->num_walls; i++)
+    {
+        render_world_rect(
+            game_state->wall_pos_x[i],
+            game_state->wall_pos_y[i],
+            game_state->wall_width[i],
+            game_state->wall_height[i],
+            0x7C4B0E
+        );
     }
 
     memcpy(render->dib_frame_buffer, render->frame_buffer, render->frame_buffer_width * render->frame_buffer_height * sizeof(render->frame_buffer[0]));
@@ -99,7 +112,8 @@ static void render_rect_to_frame_buffer(
         const f32 pos_x,
         const f32 pos_y,
         const f32 w,
-        const f32 h)
+        const f32 h,
+        const u32 color)
 {
     const f32 cam_hh = cam_hw * cam_aspect_ratio;
 
@@ -119,7 +133,7 @@ static void render_rect_to_frame_buffer(
     {
         for(s32 x = l; x < r; x++)
         {
-            frame_buffer[y * frame_buffer_width + x] = 0xFFC4A033;
+            frame_buffer[y * frame_buffer_width + x] = color;
         }
     }
 }
@@ -128,7 +142,8 @@ void render_world_rect(
         const f32 pos_x,
         const f32 pos_y,
         const f32 w,
-        const f32 h)
+        const f32 h,
+        const u32 color)
 {
     struct PlatformWin32Render* render = platform_win32_get_render();
     render_rect_to_frame_buffer(
@@ -142,6 +157,7 @@ void render_world_rect(
             pos_x,
             pos_y,
             w,
-            h);
+            h,
+            color);
 }
 

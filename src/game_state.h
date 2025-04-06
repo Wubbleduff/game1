@@ -3,18 +3,23 @@
 #include "common.h"
 
 
-#define MAX_PLAYERS 4
-#define MAX_ZOMBIES 8
+#define MAX_PLAYERS 16
+#define MAX_WALLS 64
 
 struct GameState
 {
-    u32 num_humans;
-    f32 human_pos_x[MAX_PLAYERS];
-    f32 human_pos_y[MAX_PLAYERS];
+    u32 num_players;
+    u32 sparse_player_id[MAX_PLAYERS];
+    f32 player_pos_x[MAX_PLAYERS];
+    f32 player_pos_y[MAX_PLAYERS];
+    f32 player_vel_x[MAX_PLAYERS];
+    f32 player_vel_y[MAX_PLAYERS];
 
-    u32 num_zombies;
-    f32 zombie_pos_x[MAX_ZOMBIES];
-    f32 zombie_pos_y[MAX_ZOMBIES];
+    u32 num_walls;
+    f32 wall_pos_x[MAX_WALLS];
+    f32 wall_pos_y[MAX_WALLS];
+    f32 wall_width[MAX_WALLS];
+    f32 wall_height[MAX_WALLS];
 };
 
 void init_game_state(struct GameState* game_state);

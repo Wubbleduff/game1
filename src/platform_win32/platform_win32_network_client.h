@@ -13,7 +13,7 @@ struct PlatformWin32NetworkClient
 
     char server_port_str[8];
 
-    u32 player_id;
+    u32 sparse_player_id;
 };
 
 struct PlatformWin32NetworkClient* platform_win32_get_network_client();
