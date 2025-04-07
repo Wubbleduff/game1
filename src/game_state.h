@@ -1,19 +1,19 @@
 #pragma once
 
 #include "common.h"
+#include "game_constants.h"
 
-
-#define MAX_PLAYERS 16
 #define MAX_WALLS 64
 
 struct GameState
 {
+    // Player data. Element 'MAX_ACTIVE_PLAYERS' is reserved for default player data (for when a player is added to the game). Ensure there is room.
     u32 num_players;
-    u32 sparse_player_id[MAX_PLAYERS];
-    f32 player_pos_x[MAX_PLAYERS];
-    f32 player_pos_y[MAX_PLAYERS];
-    f32 player_vel_x[MAX_PLAYERS];
-    f32 player_vel_y[MAX_PLAYERS];
+    u32 sparse_player_id[MAX_ACTIVE_PLAYERS + 8];
+    f32 player_pos_x[MAX_ACTIVE_PLAYERS + 8];
+    f32 player_pos_y[MAX_ACTIVE_PLAYERS + 8];
+    f32 player_vel_x[MAX_ACTIVE_PLAYERS + 8];
+    f32 player_vel_y[MAX_ACTIVE_PLAYERS + 8];
 
     u32 num_walls;
     f32 wall_pos_x[MAX_WALLS];
@@ -23,6 +23,8 @@ struct GameState
 };
 
 void init_game_state(struct GameState* game_state);
+
+u32 sparse_to_dense_player_id(const struct GameState* game_state, const u32 sparse_player_id);
 
 struct GameInput;
 void update_game_state(struct GameState* game_state, const struct GameState* prev_game_state, const struct GameInput* game_input);

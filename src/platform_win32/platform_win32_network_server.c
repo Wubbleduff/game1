@@ -57,7 +57,8 @@ void platform_win32_start_server(const char* listen_ipv4_addr, const u16 listen_
 
     server->client_socket = client_socket;
 
-    server->next_sparse_player_id = 0;
+    // Player ID 0 will be reserved for the server local player.
+    server->next_sparse_player_id = 1;
 
     server->num_players = 0;
 }
@@ -150,12 +151,10 @@ void platform_win32_server_receive_client_inputs(const s64 frame_num, struct Gam
     }
 
     // Populate game input with players.
-    for(u32 dense_player_id = 0; dense_player_id < server->num_players; dense_player_id++)
+    for(u32 i_player = 0; i_player < server->num_players; i_player++)
     {
-        game_input->sparse_player_id[dense_player_id] = server->sparse_player_id[dense_player_id];
-        game_input->player_input[dense_player_id] = server->player_input[dense_player_id];
+        game_input_add_player_input(game_input, server->sparse_player_id[i_player], server->player_input + i_player);
     }
-    game_input->num_players = server->num_players;
 }
 
 void platform_win32_server_send_game_state(const struct GameState* game_state)

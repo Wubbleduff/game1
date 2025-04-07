@@ -60,9 +60,20 @@ void platform_win32_render_game_state(struct GameState* game_state)
     struct PlatformWin32Common* win32_common = platform_win32_get_common();
     struct PlatformWin32Render* render = platform_win32_get_render();
 
-    for(u64 i = 0; i < render->frame_buffer_width * render->frame_buffer_height; i++)
     {
-        render->frame_buffer[i] = 0XFF191E18;
+        const u32 color = 0xFF191E18;
+        const __m256i color8 = _mm256_set1_epi32(color);
+        ASSERT(render->frame_buffer_width * render->frame_buffer_height >= 8, "Frame buffer too small.");
+        for(u64 i = 0; i < render->frame_buffer_width * render->frame_buffer_height - 8; i += 8)
+        {
+            _mm256_store_si256(
+                    (__m256i*)(render->frame_buffer + i),
+                    color8);
+        }
+        for(u64 i = render->frame_buffer_width * render->frame_buffer_height - 8; i < render->frame_buffer_width * render->frame_buffer_height; i++)
+        {
+            render->frame_buffer[i] = color;
+        }
     }
 
     for(u32 i = 0; i < game_state->num_players; i++)
@@ -125,13 +136,21 @@ static void render_rect_to_frame_buffer(
     const f32 fb_w = (w / (cam_hw * 2.0f)) * frame_buffer_width;
     const f32 fb_h = (h / (cam_hh * 2.0f)) * frame_buffer_height;
 
+    const __m256i color8 = _mm256_set1_epi32(color);
+
     const s32 l = (s32)round_neg_inf(max_f32(fb_pos_x - fb_w * 0.5f, 0.0f));
     const s32 r = (s32)round_neg_inf(min_f32(fb_pos_x + fb_w * 0.5f, (f32)frame_buffer_width));
     const s32 b = (s32)round_neg_inf(max_f32(fb_pos_y - fb_h * 0.5f, 0.0f));
     const s32 t = (s32)round_neg_inf(min_f32(fb_pos_y + fb_h * 0.5f, (f32)frame_buffer_height));
     for(s32 y = b; y < t; y++)
     {
-        for(s32 x = l; x < r; x++)
+        for(s32 x = l; x < r - 8; x += 8)
+        {
+            _mm256_storeu_si256(
+                    (__m256i*)(frame_buffer + y * frame_buffer_width + x),
+                    color8);
+        }
+        for(s32 x = max_s32(r - 8, l); x < r; x++)
         {
             frame_buffer[y * frame_buffer_width + x] = color;
         }
