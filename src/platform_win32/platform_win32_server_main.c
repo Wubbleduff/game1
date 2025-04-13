@@ -103,9 +103,11 @@ void WinMainCRTStartup()
         platform_win32_input_to_player_input(&player_input);
 
         // Add server local player input.
+        const u32 sparse_player_id = 0;
+        const u32 dense_player_id = 0;
         struct GameInput game_input;
         game_input_init(&game_input);
-        game_input_add_player_input(&game_input, 0, &player_input);
+        game_input_add_player_input(&game_input, sparse_player_id, &player_input);
 
         platform_win32_server_receive_client_inputs(frame_num, &game_input);
 
@@ -117,14 +119,13 @@ void WinMainCRTStartup()
 
         {
             struct PlatformWin32Render* render = platform_win32_get_render();
-            const u32 dense_player_id = sparse_to_dense_player_id(next_game_state, 0);
             render->camera.pos_x = next_game_state->player_pos_x[dense_player_id];
             render->camera.pos_y = next_game_state->player_pos_y[dense_player_id];
         }
 
         platform_win32_server_send_game_state(next_game_state);
 
-        platform_win32_render_game_state(next_game_state);
+        platform_win32_render_game_state(next_game_state, dense_player_id);
 
         g_main_memory.next_game_state_idx = prev_game_state_idx;
 

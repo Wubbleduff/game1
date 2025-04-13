@@ -15,6 +15,8 @@ struct PlatformWin32Render
 {
 #define MAX_FRAME_BUFFER_WIDTH 2560
 #define MAX_FRAME_BUFFER_HEIGHT 1440
+#define FRAME_BUFFER_STRIDE (MAX_FRAME_BUFFER_WIDTH)
+    _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer storage width must be a multiple of 8 to allow unconditional 8 element access.");
     _Alignas(32) u32 frame_buffer[2][MAX_FRAME_BUFFER_WIDTH * MAX_FRAME_BUFFER_HEIGHT];
     u32 frame_buffer_width;
     u32 frame_buffer_height;
@@ -37,6 +39,6 @@ u32* platform_win32_get_main_frame_buffer(
 struct Camera* platform_win32_get_main_camera();
 
 struct GameState;
-void platform_win32_render_game_state(struct GameState* game_state);
+void platform_win32_render_game_state(struct GameState* game_state, const u32 dense_player_id);
 
 

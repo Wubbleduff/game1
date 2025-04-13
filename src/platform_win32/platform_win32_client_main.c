@@ -138,9 +138,10 @@ void WinMainCRTStartup()
             const u32 dense_player_id = sparse_to_dense_player_id(game_state, client->sparse_player_id);
             render->camera.pos_x = game_state->player_pos_x[dense_player_id];
             render->camera.pos_y = game_state->player_pos_y[dense_player_id];
+
+            platform_win32_render_game_state(&g_main_memory.game_state, dense_player_id);
         }
 
-        platform_win32_render_game_state(&g_main_memory.game_state);
         platform_win32_input_end_frame();
     }
 
