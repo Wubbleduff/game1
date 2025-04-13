@@ -97,7 +97,7 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     return result;
 }
 
-void platform_win32_init_common(const u32 window_x, const u32 window_y)
+void platform_win32_init_common()
 {
     struct PlatformWin32Common* common = platform_win32_get_common();
 
@@ -114,10 +114,12 @@ void platform_win32_init_common(const u32 window_x, const u32 window_y)
     const ATOM register_class_result = RegisterClass(&wc);
     ASSERT(register_class_result, "RegisterClass failed.");
 
-    //const u32 monitor_width = GetSystemMetrics(SM_CXSCREEN);
-    //const u32 monitor_height = GetSystemMetrics(SM_CYSCREEN);
-    const u32 window_width = 1000;
-    const u32 window_height = (window_width * 3) / 4;
+    const u32 monitor_width = GetSystemMetrics(SM_CXSCREEN);
+    const u32 monitor_height = GetSystemMetrics(SM_CYSCREEN);
+    const u32 window_width = (monitor_width * 3) / 4;
+    const u32 window_height = (monitor_height * 3) / 4;
+    const u32 window_x = monitor_width / 2 - window_width / 2;
+    const u32 window_y = monitor_height / 2 - window_height / 2;
 
     common->hwnd = CreateWindowEx(
         0,

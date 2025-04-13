@@ -52,9 +52,9 @@ struct PlatformWin32Common* platform_win32_get_common()
 
 void WinMainCRTStartup()
 {
-    platform_win32_init_common(1280 + 140, 345);
+    platform_win32_init_common();
 
-    platform_win32_network_client_init("localhost", 4242);
+    platform_win32_network_client_init("www.michaelscottfritz.com", 4242);
 
     init_game_state(&g_main_memory.game_state);
     init_game_state(&g_main_memory.prev_game_state);

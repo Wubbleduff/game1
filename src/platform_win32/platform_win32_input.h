@@ -88,7 +88,8 @@ void platform_win32_clear_mouse_button(const enum MouseButton m);
 void platform_win32_input_sample();
 void platform_win32_input_end_frame();
 
-u32 platform_win32_is_keyboard_key_down(enum KeyboardKey k);
+u32 platform_win32_is_keyboard_key_down(const enum KeyboardKey k);
+u32 platform_win32_is_mouse_button_down(const enum MouseButton m);
 
 void platform_win32_get_mouse_screen_position(s32* x, s32* y);
 void platform_win32_get_mouse_screen_delta(s32* x, s32* y);

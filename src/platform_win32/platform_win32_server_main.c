@@ -52,9 +52,9 @@ struct PlatformWin32Common* platform_win32_get_common()
 
 void WinMainCRTStartup()
 {
-    platform_win32_init_common(140, 345);
+    platform_win32_init_common();
 
-    platform_win32_start_server("localhost", 4242);
+    platform_win32_start_server("192.168.1.2", 4242);
 
     g_main_memory.next_game_state_idx = 1;
     init_game_state(&g_main_memory.game_state[0]);
@@ -98,7 +98,6 @@ void WinMainCRTStartup()
             continue;
         }
         frame_timer_ns -= FRAME_DURATION_NS;
-
 
         struct PlayerInput player_input;
         platform_win32_input_to_player_input(&player_input);

@@ -11,7 +11,7 @@ struct PlatformWin32Common
 
 struct PlatformWin32Common* platform_win32_get_common();
 
-void platform_win32_init_common(const u32 window_x, const u32 window_y);
+void platform_win32_init_common();
 
 s64 platform_win32_get_time_ns();
 

@@ -270,6 +270,13 @@ void platform_win32_clear_mouse_button(const enum MouseButton m)
     input->mouse_button &= ~(u8)(1U << m);
 }
 
+u32 platform_win32_is_mouse_button_down(const enum MouseButton m)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    ASSERT(is_valid_mouse_button(m), "Invalid mouse button %u", m);
+    return (input->mouse_button & (1U << m)) != 0;
+}
+
 void platform_win32_get_mouse_screen_position(s32* x, s32* y)
 {
     struct PlatformWin32Input* input = platform_win32_get_input();

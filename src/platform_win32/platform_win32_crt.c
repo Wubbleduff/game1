@@ -23,14 +23,6 @@ void *memset(void *dst, int c, size_t count)
 #pragma function(memcpy)
 void *memcpy(void *dst, const void *src, size_t count)
 {
-    //char *dst8 = (char *)dst;
-    //const char *src8 = (const char *)src;
-    //while (count--)
-    //{
-    //    *dst8++ = *src8++;
-    //}
-    //return dst;
-
     if(count < 32)
     {
         for(u64 i = 0; i < count; i++)
@@ -40,15 +32,14 @@ void *memcpy(void *dst, const void *src, size_t count)
     }
     else
     {
-        for(u64 i = 0; i < count; i += 32)
+        for(u64 i = 0; i < count - 32; i += 32)
         {
-            _mm256_storeu_si256((__m256i*)((u8*)dst + i), _mm256_loadu_si256((__m256i*)((const u8*)src + i)));
+            _mm256_storeu_si256((__m256i*)((u8*)dst + i), _mm256_loadu_si256((const __m256i*)((const u8*)src + i)));
         }
-    }
-
-    for(u64 i = count & ~31; i < count; i++)
-    {
-        ((u8*)dst)[i] = ((const u8*)src)[i];
+        for(u64 i = count - 32; i < count; i++)
+        {
+            ((u8*)dst)[i] = ((const u8*)src)[i];
+        }
     }
     return (u8*)dst + count;
 }

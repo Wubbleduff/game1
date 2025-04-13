@@ -17,7 +17,7 @@ struct PlatformWin32NetworkServer
     u32 sparse_player_id[MAX_ACTIVE_PLAYERS];
     s64 player_last_frame_heard_from[MAX_ACTIVE_PLAYERS];
     struct PlayerInput player_input[MAX_ACTIVE_PLAYERS];
-    struct sockaddr player_addr[MAX_ACTIVE_PLAYERS];
+    struct sockaddr_in player_addr[MAX_ACTIVE_PLAYERS];
 };
 
 struct PlatformWin32NetworkServer* platform_win32_get_network_server();

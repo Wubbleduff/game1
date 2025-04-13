@@ -71,16 +71,16 @@ void platform_win32_server_receive_client_inputs(const s64 frame_num, struct Gam
     {
         s32 last_err;
         struct NetworkPacket recv_packet = {0};
-        struct sockaddr recv_addr = {0};
-        s32 recv_addr_size = sizeof(struct sockaddr);
+        struct sockaddr_in recv_addr = {0};
+        s32 recv_addr_size = sizeof(struct sockaddr_in);
         const s32 recv_res = recvfrom(
                 server->client_socket,
                 (char*)&recv_packet,
                 sizeof(recv_packet),
                 0,
-                &recv_addr,
+                (struct sockaddr*)&recv_addr,
                 &recv_addr_size);
-        ASSERT(recv_addr_size = sizeof(struct sockaddr), "Unexpected addr size");
+        ASSERT(recv_addr_size = sizeof(struct sockaddr_in), "Unexpected addr size");
         last_err = WSAGetLastError();
         if(recv_res == SOCKET_ERROR)
         {
@@ -128,7 +128,7 @@ void platform_win32_server_receive_client_inputs(const s64 frame_num, struct Gam
                 struct NetworkPacket packet = {0};
                 packet.network_packet_type = PACKET_RESPOND_ID;
                 packet.sparse_player_id = server->next_sparse_player_id;
-                s32 sendto_result = sendto(server->client_socket, (char*)&packet, sizeof(packet), 0, &recv_addr, recv_addr_size);
+                s32 sendto_result = sendto(server->client_socket, (char*)&packet, sizeof(packet), 0, (struct sockaddr*)&recv_addr, recv_addr_size);
                 last_err = WSAGetLastError();
                 ASSERT(sendto_result != SOCKET_ERROR && last_err == 0, "'sendto' failed with error: %d", last_err);
                 server->next_sparse_player_id++;
@@ -166,8 +166,14 @@ void platform_win32_server_send_game_state(const struct GameState* game_state)
         struct NetworkPacket packet = {0};
         packet.network_packet_type = PACKET_GAME_STATE;
         packet.game_state = *game_state;
-        s32 sendto_result = sendto(server->client_socket, (char*)&packet, sizeof(packet), 0, &server->player_addr[dense_player_id], sizeof(server->player_addr[dense_player_id]));
-        s32 last_err = WSAGetLastError();
+        const s32 sendto_result = sendto(
+                server->client_socket,
+                (const char*)&packet,
+                sizeof(packet),
+                0,
+                (struct sockaddr*)(server->player_addr + dense_player_id),
+                sizeof(struct sockaddr_in));
+        const s32 last_err = WSAGetLastError();
         ASSERT(sendto_result != SOCKET_ERROR && last_err == 0, "'sendto' failed with error: %d", last_err);
     }
 }

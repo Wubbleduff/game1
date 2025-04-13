@@ -63,8 +63,8 @@ void update_game_state(struct GameState* game_state, const struct GameState* pre
             const __m256i prev_dense_player_id = _mm256_load_si256((const __m256i*)(prev_game_state_dense_player_id + dense_player_id));
 
             const __m256 dt = _mm256_set1_ps(FRAME_DURATION_NS / 1000000000.0f);
-            const __m256 max_accel = _mm256_set1_ps(400.0f);
-            const __m256 player_drag = _mm256_set1_ps(-40.0f);
+            const __m256 max_accel = _mm256_set1_ps(100.0f);
+            const __m256 player_drag = _mm256_set1_ps(-20.0f);
 
             const __m256 prev_player_pos_x = _mm256_i32gather_ps(prev_game_state->player_pos_x, prev_dense_player_id, 4);
             const __m256 prev_player_pos_y = _mm256_i32gather_ps(prev_game_state->player_pos_y, prev_dense_player_id, 4);

@@ -15,9 +15,10 @@ struct PlatformWin32Render
 {
 #define MAX_FRAME_BUFFER_WIDTH 2560
 #define MAX_FRAME_BUFFER_HEIGHT 1440
-    _Alignas(32) u32 frame_buffer[MAX_FRAME_BUFFER_WIDTH * MAX_FRAME_BUFFER_HEIGHT];
+    _Alignas(32) u32 frame_buffer[2][MAX_FRAME_BUFFER_WIDTH * MAX_FRAME_BUFFER_HEIGHT];
     u32 frame_buffer_width;
     u32 frame_buffer_height;
+    u32 cur_frame_buffer;
 
     HDC dib_handle;
     u32* dib_frame_buffer;
