@@ -11,13 +11,25 @@ struct Camera
     f32 aspect_ratio;
 };
 
-struct PlatformWin32Render
-{
 #define MAX_FRAME_BUFFER_WIDTH 2560
 #define MAX_FRAME_BUFFER_HEIGHT 1440
-#define FRAME_BUFFER_STRIDE (MAX_FRAME_BUFFER_WIDTH)
+struct FloatFrameBuffer
+{
+    f32 v[MAX_FRAME_BUFFER_HEIGHT][MAX_FRAME_BUFFER_WIDTH][4];
+};
+
+struct IntFrameBuffer
+{
+    u32 v[MAX_FRAME_BUFFER_HEIGHT][MAX_FRAME_BUFFER_WIDTH];
+};
+
+struct PlatformWin32Render
+{
     _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer storage width must be a multiple of 8 to allow unconditional 8 element access.");
-    _Alignas(32) u32 frame_buffer[2][MAX_FRAME_BUFFER_WIDTH * MAX_FRAME_BUFFER_HEIGHT];
+    _Alignas(32) struct FloatFrameBuffer color_frame_buffer;
+    _Alignas(32) struct FloatFrameBuffer light_frame_buffer;
+    _Alignas(32) struct FloatFrameBuffer hdr_frame_buffer;
+    _Alignas(32) struct IntFrameBuffer blit_frame_buffers[2];
     u32 frame_buffer_width;
     u32 frame_buffer_height;
     u32 cur_frame_buffer;

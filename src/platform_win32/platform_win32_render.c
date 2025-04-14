@@ -63,19 +63,31 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
 
     const u64 fb_width = render->frame_buffer_width;
     const u64 fb_height = render->frame_buffer_height;
-    u32* fb = &render->frame_buffer[render->cur_frame_buffer][0];
+    ASSERT(fb_width < MAX_FRAME_BUFFER_WIDTH, "Frame buffer width overflow.");
+    ASSERT(fb_height < MAX_FRAME_BUFFER_HEIGHT, "Frame buffer height overflow.");
+    _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer stride not 8 aligned.");
+    struct FloatFrameBuffer* color_fb = &render->color_frame_buffer;
+    struct FloatFrameBuffer* light_fb = &render->light_frame_buffer;
+    struct FloatFrameBuffer* hdr_fb = &render->hdr_frame_buffer;
 
     {
-        const u32 color = 0xFF191E18;
-        const __m256i color8 = _mm256_set1_epi32(color);
-        _Static_assert(FRAME_BUFFER_STRIDE % 8 == 0, "Frame buffer stride not 8 aligned.");
+        const f32 r = 0.006f;
+        const f32 g = 0.04f;
+        const f32 b = 0.0f;
+        const __m256 color = _mm256_setr_ps(r, g, b, 1.0f, r, g, b, 1.0f);
         for(u64 y = 0; y < fb_height; y++)
         {
-            for(u64 x = 0; x < fb_width; x += 8)
+            for(u64 x = 0; x < fb_width; x += 2)
             {
-                _mm256_store_si256(
-                        (__m256i*)(fb + y*FRAME_BUFFER_STRIDE + x),
-                        color8);
+                _mm256_store_ps(&color_fb->v[y][x][0], color);
+            }
+        }
+
+        for(u64 y = 0; y < fb_height; y++)
+        {
+            for(u64 x = 0; x < fb_width; x += 2)
+            {
+                _mm256_store_ps(&light_fb->v[y][x][0], _mm256_set1_ps(0.1f));
             }
         }
     }
@@ -87,8 +99,10 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
             game_state->player_pos_y[i],
             0.7f,
             1.0f * (i + 1),
-            0xFFC4A033
-        );
+            2.0f,
+            1.2f,
+            0.0f,
+            1.0f);
     }
 
     for(u32 i = 0; i < game_state->num_walls; i++)
@@ -98,10 +112,54 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
             game_state->wall_pos_y[i],
             game_state->wall_width[i],
             game_state->wall_height[i],
-            0x7C4B0E
-        );
+            0.6f,
+            0.2f,
+            0.01f,
+            1.0f);
     }
 
+    const f32 player_x = game_state->player_pos_x[dense_player_id];
+    const f32 player_y = game_state->player_pos_y[dense_player_id];
+    const f32 cam_x = render->camera.pos_x;
+    const f32 cam_y = render->camera.pos_y;
+    const f32 cam_hw = render->camera.half_width;
+    const f32 cam_hh = cam_hw * render->camera.aspect_ratio;
+    const f32 world_pixel_width = (2.0f*cam_hw) * (1.0f / (f32)fb_width);
+    const f32 world_pixel_height = (2.0f*cam_hh) * (1.0f / (f32)fb_height);
+
+    {
+        _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer stride not 8 aligned.");
+        const __m256 base_p_x = _mm256_setr_ps(
+            cam_x - cam_hw + world_pixel_width * 0.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 0.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 0.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 0.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 1.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 1.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 1.0f - player_x,
+            cam_x - cam_hw + world_pixel_width * 1.0f - player_x
+        );
+        __m256 p_x = base_p_x;
+        __m256 p_y = _mm256_set1_ps(cam_y + cam_hh - player_y);
+        for(u64 y = 0; y < fb_height; y++)
+        {
+            for(u64 x = 0; x < fb_width; x += 2)
+            {
+                __m256 l = _mm256_sqrt_ps(_mm256_fmadd_ps(p_x, p_x, _mm256_mul_ps(p_y, p_y)));
+                l = _mm256_fnmadd_ps(l, _mm256_set1_ps(2.0f), _mm256_set1_ps(20.0f));
+                l = _mm256_min_ps(_mm256_max_ps(l, _mm256_set1_ps(0.0f)), _mm256_set1_ps(10.0f));
+
+                __m256 result = _mm256_loadu_ps(light_fb->v[y][x]);
+                result = _mm256_add_ps(result, l);
+                _mm256_storeu_ps(light_fb->v[y][x], result);
+
+                p_x = _mm256_add_ps(p_x, _mm256_set1_ps(2.0f * world_pixel_width));
+            }
+
+            p_x = base_p_x;
+            p_y = _mm256_sub_ps(p_y, _mm256_set1_ps(world_pixel_height));
+        }
+    }
 
     {
         /*
@@ -124,14 +182,6 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
          *
          */
 
-        const f32 player_x = game_state->player_pos_x[dense_player_id];
-        const f32 player_y = game_state->player_pos_y[dense_player_id];
-        const f32 cam_x = render->camera.pos_x;
-        const f32 cam_y = render->camera.pos_y;
-        const f32 cam_hw = render->camera.half_width;
-        const f32 cam_hh = cam_hw * render->camera.aspect_ratio;
-        const f32 world_pixel_width = (2.0f*cam_hw) * (1.0f / (f32)fb_width);
-        const f32 world_pixel_height = (2.0f*cam_hh) * (1.0f / (f32)fb_height);
 
         __m256 wall_x[MAX_WALLS][4];
         __m256 wall_y[MAX_WALLS][4];
@@ -171,7 +221,7 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
         );
         __m256 p1_x = base_p1_x;
         __m256 p1_y = _mm256_set1_ps(cam_y + cam_hh - player_y);
-        _Static_assert(FRAME_BUFFER_STRIDE % 8 == 0, "Frame buffer stride not 8 aligned.");
+        _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer stride not 8 aligned.");
         for(u64 i_y = 0; i_y < fb_height; i_y++)
         {
             for(u64 i_x = 0; i_x < fb_width; i_x += 8)
@@ -208,15 +258,35 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
                     }
                 }
 
-                const __m256 out_pixels = _mm256_loadu_ps((f32*)(fb + i_y*FRAME_BUFFER_STRIDE + i_x));
-                _mm256_storeu_ps(
-                    (f32*)(fb + i_y*FRAME_BUFFER_STRIDE + i_x),
-                    _mm256_blendv_ps(
-                        out_pixels,
-                        _mm256_set1_ps(0.0f),
-                        occluded
-                    )
-                );
+                // Expand from an 8 element ymm to 4 2 element ymm's.
+                {
+                    __m256 acegbdfh = _mm256_permutevar8x32_ps(occluded, _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7));
+                    __m256 aaaabbbb = _mm256_shuffle_ps(acegbdfh, acegbdfh, 0x00);
+                    __m256 ccccdddd = _mm256_shuffle_ps(acegbdfh, acegbdfh, 0x55);
+                    __m256 eeeeffff = _mm256_shuffle_ps(acegbdfh, acegbdfh, 0xAA);
+                    __m256 gggghhhh = _mm256_shuffle_ps(acegbdfh, acegbdfh, 0xFF);
+
+                    __m256 e01 = _mm256_loadu_ps(light_fb->v[i_y][i_x + 0]);
+                    _mm256_storeu_ps(
+                        light_fb->v[i_y][i_x + 0],
+                        _mm256_blendv_ps(e01, _mm256_set1_ps(0.0f), aaaabbbb)
+                    );
+                    __m256 e23 = _mm256_loadu_ps(light_fb->v[i_y][i_x + 2]);
+                    _mm256_storeu_ps(
+                        light_fb->v[i_y][i_x + 2],
+                        _mm256_blendv_ps(e23, _mm256_set1_ps(0.0f), ccccdddd)
+                    );
+                    __m256 e45 = _mm256_loadu_ps(light_fb->v[i_y][i_x + 4]);
+                    _mm256_storeu_ps(
+                        light_fb->v[i_y][i_x + 4],
+                        _mm256_blendv_ps(e45, _mm256_set1_ps(0.0f), eeeeffff)
+                    );
+                    __m256 e67 = _mm256_loadu_ps(light_fb->v[i_y][i_x + 6]);
+                    _mm256_storeu_ps(
+                        light_fb->v[i_y][i_x + 6],
+                        _mm256_blendv_ps(e67, _mm256_set1_ps(0.0f), gggghhhh)
+                    );
+                }
 
                 p1_x = _mm256_add_ps(p1_x, _mm256_set1_ps(8.0f * world_pixel_width));
             }
@@ -226,6 +296,46 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
         }
     }
 
+    _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer stride not 8 aligned.");
+    for(u64 y = 0; y < fb_height; y++)
+    {
+        for(u64 x = 0; x < fb_width; x += 2)
+        {
+            const __m256 c = _mm256_loadu_ps(color_fb->v[y][x]);
+            const __m256 l = _mm256_loadu_ps(light_fb->v[y][x]);
+            _mm256_storeu_ps(
+                hdr_fb->v[y][x],
+                _mm256_mul_ps(c, l)
+            );
+        }
+    }
+
+    for(u64 y = 0; y < fb_height; y++)
+    {
+        for(u64 x = 0; x < fb_width; x++)
+        {
+            for(u64 c = 0; c < 3; c++)
+            {
+                const f32 v = hdr_fb->v[y][x][c];
+                hdr_fb->v[y][x][c] = v / (v + 1.0f);
+            }
+        }
+    }
+
+    struct IntFrameBuffer* blit_fb = &render->blit_frame_buffers[render->cur_frame_buffer];
+    for(u64 y = 0; y < fb_height; y++)
+    {
+        for(u64 x = 0; x < fb_width; x++)
+        {
+            const u32 r = (u32)(hdr_fb->v[y][x][0] * 255.0f);
+            const u32 g = (u32)(hdr_fb->v[y][x][1] * 255.0f);
+            const u32 b = (u32)(hdr_fb->v[y][x][2] * 255.0f);
+            const u32 a = (u32)(hdr_fb->v[y][x][3] * 255.0f);
+            blit_fb->v[y][x] = a << 24U | r << 16U | g << 8U | b;
+        }
+    }
+
+
     // Copy frame buffer to DIB. Target DIB is not guaranteed 8 element aligned.
     for(u64 y = 0; y < fb_height; y++)
     {
@@ -233,12 +343,12 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
         {
             _mm256_storeu_si256(
                     (__m256i*)(render->dib_frame_buffer + y*fb_width + x),
-                    _mm256_loadu_si256((const __m256i*)(fb + y*FRAME_BUFFER_STRIDE + x))
+                    _mm256_loadu_si256((const __m256i*)(&blit_fb->v[y][x]))
                     );
         }
         _mm256_storeu_si256(
                 (__m256i*)(render->dib_frame_buffer + y*fb_width + fb_width-8),
-                _mm256_loadu_si256((const __m256i*)(fb + y*FRAME_BUFFER_STRIDE + fb_width-8))
+                _mm256_loadu_si256((const __m256i*)(&blit_fb->v[y][fb_width-8]))
                 );
     }
 
@@ -261,10 +371,13 @@ void render_world_rect(
         const f32 pos_y,
         const f32 w,
         const f32 h,
-        const u32 color)
+        const f32 r,
+        const f32 g,
+        const f32 b,
+        const f32 a)
 {
     struct PlatformWin32Render* render = platform_win32_get_render();
-    u32* fb = &render->frame_buffer[render->cur_frame_buffer][0];
+    struct FloatFrameBuffer* color_fb = &render->color_frame_buffer;
 
     const u32 fb_width = render->frame_buffer_width;
     const u32 fb_height = render->frame_buffer_height;
@@ -280,20 +393,18 @@ void render_world_rect(
     const f32 fb_w = (w / (cam_hw * 2.0f)) * fb_width;
     const f32 fb_h = (h / (cam_hh * 2.0f)) * fb_height;
 
-    const __m256i color8 = _mm256_set1_epi32(color);
+    const __m256 color = _mm256_setr_ps(r, g, b, a, r, g, b, a);
 
-    const s32 l = (s32)round_neg_inf(max_f32(fb_pos_x - fb_w * 0.5f, 0.0f));
-    const s32 r = (s32)round_neg_inf(min_f32(fb_pos_x + fb_w * 0.5f, (f32)fb_width));
-    const s32 b = (s32)round_neg_inf(max_f32(fb_pos_y - fb_h * 0.5f, 0.0f));
-    const s32 t = (s32)round_neg_inf(min_f32(fb_pos_y + fb_h * 0.5f, (f32)fb_height));
-    _Static_assert(FRAME_BUFFER_STRIDE % 8 == 0, "Frame buffer stride not 8 aligned.");
-    for(s32 y = b; y < t; y++)
+    const s32 left = (s32)round_neg_inf(max_f32(fb_pos_x - fb_w * 0.5f, 0.0f));
+    const s32 right = (s32)round_neg_inf(min_f32(fb_pos_x + fb_w * 0.5f, (f32)fb_width));
+    const s32 bottom = (s32)round_neg_inf(max_f32(fb_pos_y - fb_h * 0.5f, 0.0f));
+    const s32 top = (s32)round_neg_inf(min_f32(fb_pos_y + fb_h * 0.5f, (f32)fb_height));
+    _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer stride not 8 aligned.");
+    for(s32 y = bottom; y < top; y++)
     {
-        for(s32 x = l; x < r; x += 8)
+        for(s32 x = left; x < right; x += 2)
         {
-            _mm256_storeu_si256(
-                    (__m256i*)(fb + y*FRAME_BUFFER_STRIDE + x),
-                    color8);
+            _mm256_storeu_ps(&color_fb->v[y][x][0], color);
         }
     }
 }
