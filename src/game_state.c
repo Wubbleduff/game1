@@ -12,10 +12,12 @@ void init_game_state(struct GameState* game_state)
     game_state->num_players = 0;
     game_state->num_walls = 0;
 
+    // New players will default to dense_id = MAX_ACTIVE_PLAYERS.
     game_state->player_pos_x[MAX_ACTIVE_PLAYERS] = 0.0f;
     game_state->player_pos_y[MAX_ACTIVE_PLAYERS] = 0.0f;
     game_state->player_vel_x[MAX_ACTIVE_PLAYERS] = 0.0f;
     game_state->player_vel_y[MAX_ACTIVE_PLAYERS] = 0.0f;
+    game_state->player_radius[MAX_ACTIVE_PLAYERS] = 0.5f;
 }
 
 u32 sparse_to_dense_player_id(const struct GameState* game_state, const u32 sparse_player_id)
@@ -31,9 +33,6 @@ u32 sparse_to_dense_player_id(const struct GameState* game_state, const u32 spar
 void update_game_state(struct GameState* game_state, const struct GameState* prev_game_state, const struct GameInput* game_input)
 {
     {
-        _Static_assert(MAX_ACTIVE_PLAYERS >= 8, "Not wide enough.");
-        _Static_assert(MAX_ACTIVE_PLAYERS % 8 == 0, "Not 8 aligned.");
-
         u32 prev_game_state_dense_player_id[MAX_ACTIVE_PLAYERS] = {};
 
         const u32 num_players = game_input->num_players;
@@ -43,70 +42,129 @@ void update_game_state(struct GameState* game_state, const struct GameState* pre
         {
             const u32 sparse_player_id = game_input->sparse_player_id[dense_player_id];
 
-            u32 result = MAX_ACTIVE_PLAYERS;
-            for(u32 i_prev = 0; i_prev < prev_game_state->num_players; i_prev++)
-            {
-                result =
-                    prev_game_state->sparse_player_id[i_prev] == sparse_player_id
-                    ? i_prev
-                    : result;
-            }
-            prev_game_state_dense_player_id[dense_player_id] = result;
+            prev_game_state_dense_player_id[dense_player_id] = sparse_to_dense_player_id(prev_game_state, sparse_player_id);
         }
 
-        for(u64 dense_player_id = 0; dense_player_id < game_input->num_players; dense_player_id += 8)
+        // Reuse the next game state's buffers to update physics in smaller increments.
+        // Copy prev game state buffers into next game state buffers to start while also doing a sparse to dense mapping.
+        for(u32 dense_player_id = 0; dense_player_id < num_players; dense_player_id++)
         {
-            _mm256_store_si256(
-                    (__m256i*)(game_state->sparse_player_id + dense_player_id),
-                    _mm256_load_si256((const __m256i*)(game_input->sparse_player_id + dense_player_id)));
-
-            const __m256i prev_dense_player_id = _mm256_load_si256((const __m256i*)(prev_game_state_dense_player_id + dense_player_id));
-
-            const __m256 dt = _mm256_set1_ps(FRAME_DURATION_NS / 1000000000.0f);
-            const __m256 max_accel = _mm256_set1_ps(100.0f);
-            const __m256 player_drag = _mm256_set1_ps(-20.0f);
-
-            const __m256 prev_player_pos_x = _mm256_i32gather_ps(prev_game_state->player_pos_x, prev_dense_player_id, 4);
-            const __m256 prev_player_pos_y = _mm256_i32gather_ps(prev_game_state->player_pos_y, prev_dense_player_id, 4);
-            const __m256 prev_player_vel_x = _mm256_i32gather_ps(prev_game_state->player_vel_x, prev_dense_player_id, 4);
-            const __m256 prev_player_vel_y = _mm256_i32gather_ps(prev_game_state->player_vel_y, prev_dense_player_id, 4);
-
-            __m256 accel_x = _mm256_load_ps(game_input->player_move_x + dense_player_id);
-            __m256 accel_y = _mm256_load_ps(game_input->player_move_y + dense_player_id);
-            const __m256 len = _mm256_sqrt_ps(_mm256_fmadd_ps(accel_x, accel_x, _mm256_mul_ps(accel_y, accel_y)));
-            accel_x = _mm256_div_ps(accel_x, len);
-            accel_y = _mm256_div_ps(accel_y, len);
-            accel_x = _mm256_blendv_ps(
-                    accel_x,
-                    _mm256_set1_ps(0.0f),
-                    _mm256_cmp_ps(len, _mm256_set1_ps(0.0f), _CMP_EQ_UQ)
-                    );
-            accel_y = _mm256_blendv_ps(
-                    accel_y,
-                    _mm256_set1_ps(0.0f),
-                    _mm256_cmp_ps(len, _mm256_set1_ps(0.0f), _CMP_EQ_UQ)
-                    );
-            accel_x = _mm256_mul_ps(accel_x, max_accel);
-            accel_y = _mm256_mul_ps(accel_y, max_accel);
-
-            // Drag.
-            accel_x = _mm256_fmadd_ps(prev_player_vel_x, player_drag, accel_x);
-            accel_y = _mm256_fmadd_ps(prev_player_vel_y, player_drag, accel_y);
-
-            // v' = a*t + v
-            const __m256 player_vel_x = _mm256_fmadd_ps(accel_x, dt, prev_player_vel_x);
-            const __m256 player_vel_y = _mm256_fmadd_ps(accel_y, dt, prev_player_vel_y);
-            _mm256_store_ps(game_state->player_vel_x + dense_player_id, player_vel_x);
-            _mm256_store_ps(game_state->player_vel_y + dense_player_id, player_vel_y);
-
-            // p' = 0.5*a*t^2 + v*t + p
-            const __m256 hdt2 = _mm256_mul_ps(_mm256_set1_ps(0.5f), _mm256_mul_ps(dt, dt));
-            const __m256 player_pos_x = _mm256_fmadd_ps(accel_x, hdt2, _mm256_fmadd_ps(prev_player_vel_x, dt, prev_player_pos_x));
-            const __m256 player_pos_y = _mm256_fmadd_ps(accel_y, hdt2, _mm256_fmadd_ps(prev_player_vel_y, dt, prev_player_pos_y));
-            _mm256_store_ps(game_state->player_pos_x + dense_player_id, player_pos_x);
-            _mm256_store_ps(game_state->player_pos_y + dense_player_id, player_pos_y);
+            game_state->sparse_player_id[dense_player_id] = game_input->sparse_player_id[dense_player_id];
+            const u32 prev_dense_player_id = prev_game_state_dense_player_id[dense_player_id];
+            game_state->player_vel_x[dense_player_id] = prev_game_state->player_vel_x[prev_dense_player_id];
+            game_state->player_vel_y[dense_player_id] = prev_game_state->player_vel_y[prev_dense_player_id];
+            game_state->player_pos_x[dense_player_id] = prev_game_state->player_pos_x[prev_dense_player_id];
+            game_state->player_pos_y[dense_player_id] = prev_game_state->player_pos_y[prev_dense_player_id];
+            game_state->player_radius[dense_player_id] = prev_game_state->player_radius[prev_dense_player_id];
         }
         game_state->num_players = num_players;
+
+        // Iteratively update physics using the new buffers.
+        const u32 num_iterations = 16;
+        const f32 sub_dt = FRAME_DURATION_NS * (1.0f / 1000000000.0f) * (1.0f / (f32)num_iterations);
+        for(u32 iteration = 0; iteration < num_iterations; iteration++)
+        {
+            // 1. Integrate forces into velocity.
+            for(u32 dense_player_id = 0; dense_player_id < num_players; dense_player_id++)
+            {
+                game_state->sparse_player_id[dense_player_id] = game_input->sparse_player_id[dense_player_id];
+
+                const f32 max_accel = 100.0f;
+                const f32 drag = -13.0f;
+
+                const v2 prev_vel = make_v2(game_state->player_vel_x[dense_player_id], game_state->player_vel_y[dense_player_id]);
+
+                v2 accel = make_v2(game_input->player_move_x[dense_player_id], game_input->player_move_y[dense_player_id]);
+                accel = v2_normalize_or_zero(accel);
+                accel = v2_scale(accel, max_accel);
+
+                // Drag.
+                // a' = a + v * d;
+                accel = v2_add(accel, v2_scale(prev_vel, drag));
+
+                // v' = a*t + v
+                v2 vel = v2_add(prev_vel, v2_scale(accel, sub_dt));
+
+                game_state->player_vel_x[dense_player_id] = vel.x;
+                game_state->player_vel_y[dense_player_id] = vel.y;
+            }
+
+
+            // 2. Resolve velocity based on player collisions.
+            for(u32 a_id = 0; a_id < num_players; a_id++)
+            {
+                const v2 a_pos = make_v2(game_state->player_pos_x[a_id], game_state->player_pos_y[a_id]);
+                v2 a_vel = make_v2(game_state->player_vel_x[a_id], game_state->player_vel_y[a_id]);
+                const f32 a_radius = game_state->player_radius[a_id];
+
+                // Note: This technically makes us dependent on the order of updated players. We could fix this by introducing an intermediate buffer for position and velocity.
+                for(u32 b_id = a_id + 1; b_id < num_players; b_id++)
+                {
+                    const v2 b_pos = make_v2(game_state->player_pos_x[b_id], game_state->player_pos_y[b_id]);
+                    v2 b_vel = make_v2(game_state->player_vel_x[b_id], game_state->player_vel_y[b_id]);
+                    const f32 b_radius = game_state->player_radius[b_id];
+
+                    const v2 n = v2_sub(a_pos, b_pos);
+                    const v2 rel_vel = v2_sub(a_vel, b_vel);
+                    if(v2_dot(n, n) < square_f32(a_radius + b_radius) &&
+                       v2_dot(rel_vel, n) < 0.0f)
+                    {
+                        const f32 j = v2_dot(v2_scale(rel_vel, -1.0f), n) / (v2_dot(n, n) * 2.0f);
+
+                        a_vel = v2_add(a_vel, v2_scale(n, j));
+                        b_vel = v2_add(b_vel, v2_scale(n, -j));
+
+                        // Only need to write b_vel out because a_val is cached for this player and will be written at the very end.
+                        game_state->player_vel_x[b_id] = b_vel.x;
+                        game_state->player_vel_y[b_id] = b_vel.y;
+                    }
+                }
+
+                game_state->player_vel_x[a_id] = a_vel.x;
+                game_state->player_vel_y[a_id] = a_vel.y;
+            }
+
+            // 3. Resolve velocity based on wall collisions.
+            for(u32 dense_player_id = 0; dense_player_id < num_players; dense_player_id++)
+            {
+                const v2 pos = make_v2(game_state->player_pos_x[dense_player_id], game_state->player_pos_y[dense_player_id]);
+                const f32 player_radius = game_state->player_radius[dense_player_id];
+                v2 vel = make_v2(game_state->player_vel_x[dense_player_id], game_state->player_vel_y[dense_player_id]);
+
+                for(u32 i_wall = 0; i_wall < prev_game_state->num_walls; i_wall++)
+                {
+                    const f32 wall_left = prev_game_state->wall_pos_x[i_wall] - prev_game_state->wall_width[i_wall] * 0.5f;
+                    const f32 wall_right = prev_game_state->wall_pos_x[i_wall] + prev_game_state->wall_width[i_wall] * 0.5f;
+                    const f32 wall_bottom = prev_game_state->wall_pos_y[i_wall] - prev_game_state->wall_height[i_wall] * 0.5f;
+                    const f32 wall_top = prev_game_state->wall_pos_y[i_wall] + prev_game_state->wall_height[i_wall] * 0.5f;
+
+                    v2 clamped_pos = pos;
+                    clamped_pos.x = clamp_f32(pos.x, wall_left, wall_right);
+                    clamped_pos.y = clamp_f32(pos.y, wall_bottom, wall_top);
+
+                    const v2 n = v2_sub(pos, clamped_pos);
+                    if(v2_dot(n, n) < square_f32(player_radius) &&
+                       v2_dot(n, vel) < 0.0f)
+                    {
+                        const f32 j = v2_dot(v2_scale(vel, -1.0f), n) / v2_dot(n, n);
+                        vel = v2_add(vel, v2_scale(n, j));
+                    }
+                }
+
+                game_state->player_vel_x[dense_player_id] = vel.x;
+                game_state->player_vel_y[dense_player_id] = vel.y;
+            }
+
+            // 4. Integrate velocity into position.
+            for(u32 dense_player_id = 0; dense_player_id < num_players; dense_player_id++)
+            {
+                const v2 pos = make_v2(game_state->player_pos_x[dense_player_id], game_state->player_pos_y[dense_player_id]);
+                const v2 vel = make_v2(game_state->player_vel_x[dense_player_id], game_state->player_vel_y[dense_player_id]);
+                const v2 next_pos = v2_add(pos, v2_scale(vel, sub_dt));
+                game_state->player_pos_x[dense_player_id] = next_pos.x;
+                game_state->player_pos_y[dense_player_id] = next_pos.y;
+            }
+        }
     }
 
     game_state->num_walls = LEVEL_0_NUM_WALLS;
@@ -114,6 +172,5 @@ void update_game_state(struct GameState* game_state, const struct GameState* pre
     COPY(game_state->wall_pos_y, level_0_wall_pos_y, LEVEL_0_NUM_WALLS);
     COPY(game_state->wall_width, level_0_wall_width, LEVEL_0_NUM_WALLS);
     COPY(game_state->wall_height, level_0_wall_height, LEVEL_0_NUM_WALLS);
-
 }
 

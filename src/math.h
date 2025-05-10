@@ -21,6 +21,11 @@ inline f32 round_neg_inf(const f32 a)
     return _mm_cvtss_f32(_mm_round_ps(_mm_set1_ps(a), _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC));
 }
 
+inline f32 round_pos_inf(const f32 a)
+{
+    return _mm_cvtss_f32(_mm_round_ps(_mm_set1_ps(a), _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC));
+}
+
 inline u8 square_u8(const u8 n) { return n*n; }
 inline u16 square_u16(const u16 n) { return n*n; }
 inline u32 square_u32(const u32 n) { return n*n; }
@@ -56,6 +61,8 @@ inline s32 max_s32(const s32 a, const s32 b) { return a > b ? a : b; }
 inline s64 max_s64(const s64 a, const s64 b) { return a > b ? a : b; }
 
 inline f32 max_f32(const f32 a, const f32 b) { return a > b ? a : b; }
+
+inline f32 clamp_f32(const f32 a, const f32 min, const f32 max) { return min_f32(max_f32(a, min), max); }
 
 #define H_PI 1.57079637f
 #define PI 3.14159274f
@@ -200,6 +207,20 @@ inline v3 v3_cross(v3 a, v3 b)
             _mm_shuffle_ps(b.v, b.v, 0b11001001)
         )
     );
+    return r;
+}
+
+inline v2 v2_sub(v2 a, v2 b)
+{
+    v2 r;
+    r.v = _mm_sub_ps(a.v, b.v);
+    return r;
+}
+
+inline v2 v2_add(v2 a, v2 b)
+{
+    v2 r;
+    r.v = _mm_add_ps(a.v, b.v);
     return r;
 }
 

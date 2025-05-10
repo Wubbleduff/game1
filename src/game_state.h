@@ -14,6 +14,7 @@ struct GameState
     f32 player_pos_y[MAX_ACTIVE_PLAYERS + 8];
     f32 player_vel_x[MAX_ACTIVE_PLAYERS + 8];
     f32 player_vel_y[MAX_ACTIVE_PLAYERS + 8];
+    f32 player_radius[MAX_ACTIVE_PLAYERS + 8];
 
     u32 num_walls;
     f32 wall_pos_x[MAX_WALLS];

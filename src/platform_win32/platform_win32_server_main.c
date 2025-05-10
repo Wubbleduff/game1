@@ -58,6 +58,7 @@ void WinMainCRTStartup()
 
     g_main_memory.next_game_state_idx = 1;
     init_game_state(&g_main_memory.game_state[0]);
+    init_game_state(&g_main_memory.game_state[1]);
 
     s64 frame_timer_ns = 0;
     s64 last_frame_time_ns = platform_win32_get_time_ns();

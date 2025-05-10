@@ -12,3 +12,12 @@ void render_world_rect(
         const f32 b,
         const f32 a);
 
+void render_world_circle(
+        const f32 pos_x,
+        const f32 pos_y,
+        const f32 radius,
+        const f32 r,
+        const f32 g,
+        const f32 b,
+        const f32 a);
+

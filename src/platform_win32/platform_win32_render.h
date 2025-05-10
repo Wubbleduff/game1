@@ -13,6 +13,7 @@ struct Camera
 
 #define MAX_FRAME_BUFFER_WIDTH 2560
 #define MAX_FRAME_BUFFER_HEIGHT 1440
+_Static_assert(MAX_FRAME_BUFFER_WIDTH % 32 == 0, "Frame buffer is not 32 byte aligned.");
 struct FloatFrameBuffer
 {
     f32 v[MAX_FRAME_BUFFER_HEIGHT][MAX_FRAME_BUFFER_WIDTH][4];
@@ -28,7 +29,6 @@ struct PlatformWin32Render
     _Static_assert(MAX_FRAME_BUFFER_WIDTH % 8 == 0, "Frame buffer storage width must be a multiple of 8 to allow unconditional 8 element access.");
     _Alignas(32) struct FloatFrameBuffer color_frame_buffer;
     _Alignas(32) struct FloatFrameBuffer light_frame_buffer;
-    _Alignas(32) struct FloatFrameBuffer hdr_frame_buffer;
     _Alignas(32) struct IntFrameBuffer blit_frame_buffers[2];
     u32 frame_buffer_width;
     u32 frame_buffer_height;
