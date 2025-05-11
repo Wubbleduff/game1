@@ -135,8 +135,8 @@ void update_game_state(struct GameState* game_state, const struct GameState* pre
             // 1. Integrate forces into player velocity.
             for(u32 dense_player_id = 0; dense_player_id < num_players; dense_player_id++)
             {
-                const f32 max_accel = 100.0f;
-                const f32 drag = -13.0f;
+                const f32 max_accel = 30.0f;
+                const f32 drag = -8.0f;
 
                 v2 vel = make_v2(game_state->player_vel_x[dense_player_id], game_state->player_vel_y[dense_player_id]);
 

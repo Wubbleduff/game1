@@ -63,7 +63,7 @@ void platform_win32_init_render()
 
     render->camera.pos_x = 0.0f;
     render->camera.pos_y = 0.0f;
-    render->camera.half_width = 15.0f;
+    render->camera.half_width = 20.0f;
     render->camera.aspect_ratio = (f32)client_rect.bottom / (f32)client_rect.right;
 }
 
