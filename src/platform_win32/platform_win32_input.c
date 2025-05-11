@@ -251,6 +251,15 @@ u32 platform_win32_is_keyboard_key_down(const enum KeyboardKey k)
     return (input->keyboard_buf[k >> 3] & (1 << (k & 7))) != 0;
 }
 
+u32 platform_win32_is_keyboard_key_toggled_down(const enum KeyboardKey k)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    ASSERT(is_keyboard_key_valid(k), "Invalid keyboard key %u", k);
+    const u32 cur_frame = (input->keyboard_buf[k >> 3] & (1 << (k & 7))) != 0;
+    const u32 prev_frame = (input->prev_keyboard_buf[k >> 3] & (1 << (k & 7))) != 0;
+    return cur_frame && !prev_frame;
+}
+
 static u32 is_valid_mouse_button(const enum MouseButton m)
 {
     return m >= GAME_MB_LEFT && m < NUM_MOUSE_BUTTONS;
@@ -277,6 +286,15 @@ u32 platform_win32_is_mouse_button_down(const enum MouseButton m)
     return (input->mouse_button & (1U << m)) != 0;
 }
 
+u32 platform_win32_is_mouse_button_toggled_down(const enum MouseButton m)
+{
+    struct PlatformWin32Input* input = platform_win32_get_input();
+    ASSERT(is_valid_mouse_button(m), "Invalid mouse button %u", m);
+    const u32 cur_frame =  (input->mouse_button & (1U << m)) != 0;
+    const u32 prev_frame =  (input->prev_mouse_button & (1U << m)) != 0;
+    return cur_frame && !prev_frame;
+}
+
 void platform_win32_get_mouse_screen_position(s32* x, s32* y)
 {
     struct PlatformWin32Input* input = platform_win32_get_input();
@@ -291,7 +309,23 @@ void platform_win32_get_mouse_screen_delta(s32* x, s32* y)
     *y = input->mouse_screen_y - input->prev_mouse_screen_y;
 }
 
-void platform_win32_input_to_player_input(struct PlayerInput* player_input)
+void platform_win32_get_mouse_world_position(f32* x, f32* y)
+{
+    const struct PlatformWin32Render* render = platform_win32_get_render();
+
+    s32 mouse_screen_pos[2]; 
+    platform_win32_get_mouse_screen_position(mouse_screen_pos + 0, mouse_screen_pos + 1);
+
+    const f32 cx = render->camera.pos_x;
+    const f32 cy = render->camera.pos_y;
+    const f32 chw = render->camera.half_width;
+    const f32 chh = render->camera.half_width * render->camera.aspect_ratio;
+
+    *x = (f32)mouse_screen_pos[0] * (1.0f / (f32)render->frame_buffer_width) * chw * 2.0f + cx - chw;
+    *y = (1.0f - (f32)mouse_screen_pos[1] * (1.0f / (f32)render->frame_buffer_height)) * chh * 2.0f + cy - chh;
+}
+
+void platform_win32_input_to_player_input(struct PlayerInput* player_input, const f32 player_pos_x, const f32 player_pos_y)
 {
     player_input->move_x =
         platform_win32_is_keyboard_key_down(KB_A) && platform_win32_is_keyboard_key_down(KB_D) ? 127
@@ -304,6 +338,13 @@ void platform_win32_input_to_player_input(struct PlayerInput* player_input)
         : platform_win32_is_keyboard_key_down(KB_S) ? 0
         : platform_win32_is_keyboard_key_down(KB_W) ? 254
         : 127;
+
+    player_input->shoot = (u8)platform_win32_is_mouse_button_toggled_down(GAME_MB_LEFT);
+    v2 mouse_world = v2_zero();
+    platform_win32_get_mouse_world_position(&mouse_world.x, &mouse_world.y);
+    v2 shoot_dir = v2_normalize_or_default(v2_sub(mouse_world, make_v2(player_pos_x, player_pos_y)), make_v2(1.0f, 0.0f));
+    player_input->shoot_dir_x = shoot_dir.x;
+    player_input->shoot_dir_y = shoot_dir.y;
 
 }
 

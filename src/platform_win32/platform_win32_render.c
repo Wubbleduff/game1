@@ -8,6 +8,17 @@
 #include "math.h"
 #include "game_state.h"
 
+static const f32 g_player_color_pallete[8][3] = {
+    {2.0f, 1.2f, 0.0f},
+    {2.0f, 0.1f, 1.5f},
+    {0.1f, 0.8f, 1.4f},
+    {1.5f, 0.8f, 0.4f},
+    {2.0f, 2.0f, 0.1f},
+    {2.0f, 2.0f, 2.0f},
+    {0.1f, 0.2f, 2.0f},
+    {0.01f, 0.01f, 0.01f},
+};
+
 void platform_win32_init_render()
 {
     struct PlatformWin32Common* win32_common = platform_win32_get_common();
@@ -56,7 +67,7 @@ void platform_win32_init_render()
     render->camera.aspect_ratio = (f32)client_rect.bottom / (f32)client_rect.right;
 }
 
-void platform_win32_render_game_state(struct GameState* game_state, const u32 dense_player_id)
+void platform_win32_render_game_state(const struct GameState* game_state, const u32 dense_player_id)
 {
     struct PlatformWin32Common* win32_common = platform_win32_get_common();
     struct PlatformWin32Render* render = platform_win32_get_render();
@@ -89,8 +100,19 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
             game_state->player_pos_x[i],
             game_state->player_pos_y[i],
             game_state->player_radius[i],
-            2.0f,
-            1.2f,
+            g_player_color_pallete[game_state->sparse_player_id[i] % ARRAY_COUNT(g_player_color_pallete)][0],
+            g_player_color_pallete[game_state->sparse_player_id[i] % ARRAY_COUNT(g_player_color_pallete)][1],
+            g_player_color_pallete[game_state->sparse_player_id[i] % ARRAY_COUNT(g_player_color_pallete)][2],
+            1.0f);
+    }
+    for(u32 i = 0; i < game_state->num_bullets; i++)
+    {
+        render_world_circle(
+            game_state->bullet_pos_x[i],
+            game_state->bullet_pos_y[i],
+            0.05f,
+            10.0f,
+            0.05f,
             0.0f,
             1.0f);
     }
@@ -138,7 +160,7 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
                 l = _mm256_fnmadd_ps(l, _mm256_set1_ps(2.0f), _mm256_set1_ps(20.0f));
                 l = _mm256_min_ps(_mm256_max_ps(l, _mm256_set1_ps(0.0f)), _mm256_set1_ps(10.0f));
 
-                __m256 result = _mm256_set1_ps(0.1f);
+                __m256 result = _mm256_set1_ps(0.0f);
                 result = _mm256_add_ps(result, l);
                 _mm256_store_ps(light_fb->v[y][x], result);
 
@@ -258,22 +280,22 @@ void platform_win32_render_game_state(struct GameState* game_state, const u32 de
                     __m256 e01 = _mm256_load_ps(light_fb->v[i_y][i_x + 0]);
                     _mm256_store_ps(
                         light_fb->v[i_y][i_x + 0],
-                        _mm256_blendv_ps(e01, _mm256_set1_ps(0.1f), aaaabbbb)
+                        _mm256_blendv_ps(e01, _mm256_set1_ps(0.0f), aaaabbbb)
                     );
                     __m256 e23 = _mm256_load_ps(light_fb->v[i_y][i_x + 2]);
                     _mm256_store_ps(
                         light_fb->v[i_y][i_x + 2],
-                        _mm256_blendv_ps(e23, _mm256_set1_ps(0.1f), ccccdddd)
+                        _mm256_blendv_ps(e23, _mm256_set1_ps(0.0f), ccccdddd)
                     );
                     __m256 e45 = _mm256_load_ps(light_fb->v[i_y][i_x + 4]);
                     _mm256_store_ps(
                         light_fb->v[i_y][i_x + 4],
-                        _mm256_blendv_ps(e45, _mm256_set1_ps(0.1f), eeeeffff)
+                        _mm256_blendv_ps(e45, _mm256_set1_ps(0.0f), eeeeffff)
                     );
                     __m256 e67 = _mm256_load_ps(light_fb->v[i_y][i_x + 6]);
                     _mm256_store_ps(
                         light_fb->v[i_y][i_x + 6],
-                        _mm256_blendv_ps(e67, _mm256_set1_ps(0.1f), gggghhhh)
+                        _mm256_blendv_ps(e67, _mm256_set1_ps(0.0f), gggghhhh)
                     );
                 }
 
@@ -420,9 +442,6 @@ void render_world_circle(
     const f32 top = min_f32(fb_pos_y + fb_radius, (f32)fb_height);
     _Static_assert(MAX_FRAME_BUFFER_WIDTH % 32 == 0, "Frame buffer stride not 32 aligned.");
 
-    const __m256 mid_x = _mm256_set1_ps((left + right) * 0.5f);
-    const __m256 mid_y = _mm256_set1_ps((bottom + top) * 0.5f);
-
     for(s32 i_y = (s32)bottom; i_y < (s32)top; i_y++)
     {
         for(s32 i_x = (s32)left; i_x < (s32)right; i_x += 2)
@@ -432,8 +451,8 @@ void render_world_circle(
                     (f32)i_x + 1.0f, (f32)i_x + 1.0f, (f32)i_x + 1.0f, (f32)i_x + 1.0f);
             const __m256 y = _mm256_set1_ps((f32)i_y);
 
-            const __m256 dx = _mm256_sub_ps(x, mid_x);
-            const __m256 dy = _mm256_sub_ps(y, mid_y);
+            const __m256 dx = _mm256_sub_ps(x, _mm256_set1_ps(fb_pos_x));
+            const __m256 dy = _mm256_sub_ps(y, _mm256_set1_ps(fb_pos_y));
 
             const __m256 len_sq = _mm256_fmadd_ps(dx, dx, _mm256_mul_ps(dy, dy));
             const __m256 mask = _mm256_cmp_ps(len_sq, _mm256_set1_ps(square_f32(fb_radius)), _CMP_LT_OQ);

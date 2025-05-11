@@ -60,9 +60,12 @@ void platform_win32_network_client_init(
     ASSERT(err_code == 0, "ioctlsocket failed with error: %d", WSAGetLastError());
 }
 
-void platform_win32_network_client_update(struct GameState* game_state, const struct PlayerInput* player_input)
+void platform_win32_network_client_update(struct GameState* game_state, const struct GameState* prev_game_state, const struct PlayerInput* player_input)
 {
     struct PlatformWin32NetworkClient* client = platform_win32_get_network_client();
+
+    // Always populate the next game state last known good.
+    *game_state = *prev_game_state;
 
     s32 last_err;
 

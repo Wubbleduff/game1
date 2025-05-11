@@ -274,6 +274,18 @@ inline v2 v2_normalize_or_zero(v2 a)
     return r;
 }
 
+inline v2 v2_normalize_or_default(v2 a, v2 def)
+{
+    // TODO(mfritz) No need to go to scalar here.
+    v2 r = a;
+    const f32 len_sqr = v2_dot(a, a);
+    const f32 len = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set1_ps(len_sqr)));
+    r = len == 0.0f
+        ? def
+        : v2_scale(r, 1.0f / len);
+    return r;
+}
+
 inline v3 v3_normalize(v3 a)
 {
     // TODO(mfritz) No need to go to scalar here.

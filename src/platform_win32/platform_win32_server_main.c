@@ -100,22 +100,24 @@ void WinMainCRTStartup()
         }
         frame_timer_ns -= FRAME_DURATION_NS;
 
-        struct PlayerInput player_input;
-        platform_win32_input_to_player_input(&player_input);
+        const u32 next_game_state_idx = g_main_memory.next_game_state_idx;
+        const u32 prev_game_state_idx = (next_game_state_idx + 1) & 1;
+        const struct GameState* prev_game_state = &g_main_memory.game_state[prev_game_state_idx];
+        struct GameState* next_game_state = &g_main_memory.game_state[next_game_state_idx];
 
         // Add server local player input.
         const u32 sparse_player_id = 0;
         const u32 dense_player_id = 0;
+
+        struct PlayerInput player_input;
+        platform_win32_input_to_player_input(&player_input, prev_game_state->player_pos_x[dense_player_id], prev_game_state->player_pos_y[dense_player_id]);
+
         struct GameInput game_input;
         game_input_init(&game_input);
         game_input_add_player_input(&game_input, sparse_player_id, &player_input);
 
         platform_win32_server_receive_client_inputs(frame_num, &game_input);
 
-        const u32 next_game_state_idx = g_main_memory.next_game_state_idx;
-        const u32 prev_game_state_idx = (next_game_state_idx + 1) & 1;
-        const struct GameState* prev_game_state = &g_main_memory.game_state[prev_game_state_idx];
-        struct GameState* next_game_state = &g_main_memory.game_state[next_game_state_idx];
         update_game_state(next_game_state, prev_game_state, &game_input);
 
         {

@@ -22,5 +22,5 @@ void platform_win32_network_client_init(const char* server_ipv4_addr, const u16 
 
 struct PlayerInput;
 struct GameState;
-void platform_win32_network_client_update(struct GameState* game_state, const struct PlayerInput* player_input);
+void platform_win32_network_client_update(struct GameState* game_state, const struct GameState* prev_game_state, const struct PlayerInput* player_input);
 

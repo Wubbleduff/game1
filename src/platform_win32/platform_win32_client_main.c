@@ -23,8 +23,8 @@ struct MainMemory
 
     struct PlatformWin32NetworkClient network_client;
 
-    struct GameState game_state;
-    struct GameState prev_game_state;
+    u32 next_game_state_idx;
+    struct GameState game_state[2];
 };
 
 static struct MainMemory g_main_memory;
@@ -56,8 +56,9 @@ void WinMainCRTStartup()
 
     platform_win32_network_client_init("www.michaelscottfritz.com", 4242);
 
-    init_game_state(&g_main_memory.game_state);
-    init_game_state(&g_main_memory.prev_game_state);
+    g_main_memory.next_game_state_idx = 1;
+    init_game_state(&g_main_memory.game_state[0]);
+    init_game_state(&g_main_memory.game_state[1]);
 
     s64 frame_timer_ns = 0;
     s64 last_frame_time_ns = platform_win32_get_time_ns();
@@ -107,13 +108,13 @@ void WinMainCRTStartup()
             s32 new_pos_y = window_rect.top + mouse_dy;
 
             const BOOL set_window_pos_result = SetWindowPos(
-              hwnd,
-              0,
-              new_pos_x,
-              new_pos_y,
-              window_rect.right - window_rect.left,
-              window_rect.bottom - window_rect.top,
-              0);
+                    hwnd,
+                    0,
+                    new_pos_x,
+                    new_pos_y,
+                    window_rect.right - window_rect.left,
+                    window_rect.bottom - window_rect.top,
+                    0);
             ASSERT(set_window_pos_result, "SetWindowPos failed.");
         }
 
@@ -124,23 +125,29 @@ void WinMainCRTStartup()
         }
         frame_timer_ns -= FRAME_DURATION_NS;
 
-        struct PlayerInput player_input;
-        platform_win32_input_to_player_input(&player_input);
+        const u32 next_game_state_idx = g_main_memory.next_game_state_idx;
+        const u32 prev_game_state_idx = (next_game_state_idx + 1) & 1;
+        const struct GameState* prev_game_state = &g_main_memory.game_state[prev_game_state_idx];
+        struct GameState* next_game_state = &g_main_memory.game_state[next_game_state_idx];
 
-        platform_win32_network_client_update(&g_main_memory.game_state, &player_input);
+        // TODO(mfritz) Clean up API here.
+        struct PlatformWin32NetworkClient* client = platform_win32_get_network_client();
 
-        // update_game_state(&g_main_memory.game_state, &g_main_memory.prev_game_state, &game_input);
+        const u32 prev_dense_player_id = sparse_to_dense_player_id(prev_game_state, client->sparse_player_id);
 
         {
-            struct PlatformWin32NetworkClient* client = platform_win32_get_network_client();
-            struct GameState* game_state = &g_main_memory.game_state;
             struct PlatformWin32Render* render = platform_win32_get_render();
-            const u32 dense_player_id = sparse_to_dense_player_id(game_state, client->sparse_player_id);
-            render->camera.pos_x = game_state->player_pos_x[dense_player_id];
-            render->camera.pos_y = game_state->player_pos_y[dense_player_id];
-
-            platform_win32_render_game_state(&g_main_memory.game_state, dense_player_id);
+            render->camera.pos_x = prev_game_state->player_pos_x[prev_dense_player_id];
+            render->camera.pos_y = prev_game_state->player_pos_y[prev_dense_player_id];
         }
+        platform_win32_render_game_state(prev_game_state, prev_dense_player_id);
+
+        struct PlayerInput player_input;
+        platform_win32_input_to_player_input(&player_input, prev_game_state->player_pos_x[prev_dense_player_id], prev_game_state->player_pos_y[prev_dense_player_id]);
+
+        platform_win32_network_client_update(next_game_state, prev_game_state, &player_input);
+
+        g_main_memory.next_game_state_idx = prev_game_state_idx;
 
         platform_win32_input_end_frame();
     }

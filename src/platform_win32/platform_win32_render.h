@@ -51,6 +51,6 @@ u32* platform_win32_get_main_frame_buffer(
 struct Camera* platform_win32_get_main_camera();
 
 struct GameState;
-void platform_win32_render_game_state(struct GameState* game_state, const u32 dense_player_id);
+void platform_win32_render_game_state(const struct GameState* game_state, const u32 dense_player_id);
 
 

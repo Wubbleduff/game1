@@ -89,11 +89,15 @@ void platform_win32_input_sample();
 void platform_win32_input_end_frame();
 
 u32 platform_win32_is_keyboard_key_down(const enum KeyboardKey k);
+u32 platform_win32_is_keyboard_key_toggled_down(const enum KeyboardKey k);
 u32 platform_win32_is_mouse_button_down(const enum MouseButton m);
+u32 platform_win32_is_mouse_button_toggled_down(const enum MouseButton m);
 
 void platform_win32_get_mouse_screen_position(s32* x, s32* y);
 void platform_win32_get_mouse_screen_delta(s32* x, s32* y);
 
+void platform_win32_get_mouse_world_position(f32* x, f32* y);
+
 struct PlayerInput;
-void platform_win32_input_to_player_input(struct PlayerInput* player_input);
+void platform_win32_input_to_player_input(struct PlayerInput* player_input, const f32 player_pos_x, const f32 player_pos_y);
 
